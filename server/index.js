@@ -114,26 +114,45 @@ app.get("/messages/:room?", async (req, res) => {
 });
 
 // --- SOCKET.IO ---
+let onlineUsers = new Map();
+
 io.on("connection", (socket) => {
   console.log("🟢 New client connected:", socket.id);
 
+  // When a user joins, store them
+  socket.on("join", (username) => {
+    onlineUsers.set(socket.id, username);
+    io.emit("onlineUsers", Array.from(onlineUsers.values()));
+  });
+
+  // User typing
+  socket.on("typing", (username) => {
+    console.log(username, "is typing...");
+    socket.broadcast.emit("typing", username); // notify all other users
+  });
+
+  socket.on("stopTyping", () => {
+    socket.broadcast.emit("stopTyping"); // clear indicator for others
+  });
+
+  // On disconnect, remove them
+  socket.on("disconnect", () => {
+    console.log("🔴 Client disconnected:", socket.id);
+    onlineUsers.delete(socket.id);
+    io.emit("onlineUsers", Array.from(onlineUsers.values()));
+  });
+
+  // Handle chat messages
   socket.on("sendMessage", async (data) => {
     try {
       const { room = "global", username, text } = data;
-
-      // Save to DB
       const message = new Message({ room, username, text });
       await message.save();
 
-      // Broadcast to all clients
       io.emit("receiveMessage", message);
     } catch (err) {
       console.error("Error saving message:", err);
     }
-  });
-
-  socket.on("disconnect", () => {
-    console.log("🔴 Client disconnected:", socket.id);
   });
 });
 
