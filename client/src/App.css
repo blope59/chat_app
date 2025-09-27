@@ -1,0 +1,273 @@
+/* =========================
+   Global / Theme
+   ========================= */
+:root {
+  --bg: #f6f7fb;
+  --card: #ffffff;
+  --accent: #5b8def;
+  --muted: #666;
+  --border: #f0f2f6;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: var(--bg);
+  color: #111;
+}
+
+/* =========================
+   Auth (Login/Signup)
+   ========================= */
+.app {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.login {
+  width: 420px;
+  background: var(--card);
+  padding: 24px;
+  border-radius: 12px;
+  box-shadow: 0 6px 18px rgba(20, 30, 60, 0.08);
+}
+
+.login h2 {
+  margin: 0 0 12px;
+}
+
+.login input {
+  padding: 10px;
+  border: 1px solid #e6e9ef;
+  border-radius: 8px;
+  display: block;
+  width: 100%;
+  margin-bottom: 10px;
+}
+
+.login button {
+  padding: 10px;
+  border: 0;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 8px;
+  cursor: pointer;
+  width: 100%;
+}
+
+.link {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+/* =========================
+   Chat Shell
+   ========================= */
+.chat-container {
+  width: 100%;
+  max-width: 1000px;
+  height: 92vh;
+  background: var(--card);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 8px 30px rgba(20, 30, 60, 0.08);
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+  background: #fafafa;
+}
+
+.logout {
+  padding: 6px 12px;
+  border: 0;
+  background: #dc3545;
+  color: #fff;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.chat-main {
+  display: flex;
+  flex: 1;
+  min-height: 0; /* allow children to scroll */
+}
+
+/* =========================
+   Sidebar
+   ========================= */
+.sidebar {
+  width: 220px;
+  padding: 16px;
+  border-right: 1px solid var(--border);
+  background: #fbfcff;
+  overflow-y: auto;
+}
+
+.sidebar h4 {
+  margin: 0 0 8px;
+}
+
+/* =========================
+   Messages Area
+   ========================= */
+.messages-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0; /* prevent overflow */
+}
+
+.messages {
+  padding: 16px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* prettier scrollbar (optional) */
+.messages::-webkit-scrollbar { width: 8px; }
+.messages::-webkit-scrollbar-thumb {
+  background: #d7dbec;
+  border-radius: 8px;
+}
+
+/* ----- Date separators (centered pill) ----- */
+.date-row {
+  display: flex;
+  justify-content: center;
+  margin: 12px 0;
+}
+
+.date-label {
+  display: inline-block;
+  background: #e0e0e0;
+  color: #333;
+  font-size: 0.85em;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 20px;
+}
+
+/* ----- Message rows & bubbles ----- */
+.message {
+  display: flex;
+  width: 100%;           /* full row so we can push left/right */
+  margin-bottom: 12px;
+}
+
+.message.other { justify-content: flex-start; }
+.message.me    { justify-content: flex-end;   }
+
+.message .text {
+  max-width: 70%;
+  min-width: 120px;
+  padding: 10px 14px 20px; /* extra bottom padding for timestamp */
+  border-radius: 12px;
+  background: #f5f7ff;    /* default gray bubble */
+  position: relative;     /* parent for absolute timestamp */
+  word-break: break-word;
+}
+
+/* My messages (blue, right) */
+.message.me .text {
+  background: var(--accent);
+  color: #fff;
+  border-radius: 16px 16px 0 16px;
+}
+
+/* Other messages (gray, left) */
+.message.other .text {
+  background: #f5f7ff;
+  color: #000;
+  border-radius: 16px 16px 16px 0;
+}
+
+/* Timestamp sits bottom-right inside bubble */
+.timestamp {
+  position: absolute;
+  bottom: 4px;
+  right: 10px;
+  font-size: 0.7em;
+  opacity: 0.75;
+}
+
+/* darker timestamp for non-blue bubbles */
+.message.other .timestamp { color: #666; }
+
+/* =========================
+   Composer / Typing / New Messages
+   ========================= */
+.composer {
+  display: flex;
+  padding: 12px;
+  border-top: 1px solid var(--border);
+  gap: 8px;
+  background: #fff;
+}
+
+.composer textarea {
+  flex: 1;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #e6e9ef;
+  min-height: 48px;
+  resize: none;
+}
+
+.composer button {
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: 0;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+}
+
+.typing {
+  font-style: italic;
+  color: var(--muted);
+  padding: 4px 12px;
+}
+
+/* floating "new messages" badge */
+.newMessages {
+  position: fixed;
+  bottom: 80px;
+  right: 20px;
+  padding: 8px 14px;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 20px;
+  text-align: center;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+/* =========================
+   Responsive tweaks
+   ========================= */
+@media (max-width: 840px) {
+  .sidebar { display: none; }
+  .chat-container { height: 94vh; }
+}
+
+@media (max-width: 520px) {
+  .message .text { max-width: 85%; }
+}

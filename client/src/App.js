@@ -1,9 +1,68 @@
 import React, { useState, useEffect, useRef } from "react";
 import io from "socket.io-client";
 import axios from "axios";
+import "./App.css";
 
 const SERVER_URL = process.env.REACT_APP_SERVER_URL || "http://localhost:3001";
 const socket = io(SERVER_URL, { transports: ["websocket"] });
+
+function formatTimestamp(dateString) {
+  const date = new Date(dateString);
+  const now = new Date();
+
+  const isToday =
+    date.getDate() === now.getDate() &&
+    date.getMonth() === now.getMonth() &&
+    date.getFullYear() === now.getFullYear();
+
+  if (isToday) {
+    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  }
+
+  return date.toLocaleDateString([], {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function groupMessagesByDate(messages) {
+  const groups = {};
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+
+  for (const msg of messages) {
+    const msgDate = new Date(msg.createdAt);
+    let label;
+
+    if (
+      msgDate.getDate() === today.getDate() &&
+      msgDate.getMonth() === today.getMonth() &&
+      msgDate.getFullYear() === today.getFullYear()
+    ) {
+      label = "Today";
+    } else if (
+      msgDate.getDate() === yesterday.getDate() &&
+      msgDate.getMonth() === yesterday.getMonth() &&
+      msgDate.getFullYear() === yesterday.getFullYear()
+    ) {
+      label = "Yesterday";
+    } else {
+      label = msgDate.toLocaleDateString([], {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+    }
+
+    if (!groups[label]) groups[label] = [];
+    groups[label].push(msg);
+  }
+
+  return groups;
+}
 
 function App() {
   const [username, setUsername] = useState(null);
@@ -21,7 +80,6 @@ function App() {
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
 
-  // --- Load user from localStorage ---
   useEffect(() => {
     const storedUser = localStorage.getItem("chatUser");
     const storedToken = localStorage.getItem("chatToken");
@@ -32,7 +90,6 @@ function App() {
     }
   }, []);
 
-  // --- AUTH ---
   const handleAuth = async (e) => {
     e.preventDefault();
     try {
@@ -58,7 +115,6 @@ function App() {
     localStorage.removeItem("chatToken");
   };
 
-  // --- LOAD MESSAGES ---
   useEffect(() => {
     if (!username) return;
     const fetchMessages = async () => {
@@ -72,7 +128,6 @@ function App() {
     fetchMessages();
   }, [username]);
 
-  // --- SOCKET LISTENERS ---
   useEffect(() => {
     socket.on("receiveMessage", (message) => {
       setMessages((prev) => [...prev, message]);
@@ -94,7 +149,6 @@ function App() {
     };
   }, []);
 
-  // --- Helper: check if user is near bottom ---
   const isNearBottom = () => {
     const container = messagesContainerRef.current;
     if (!container) return true;
@@ -103,7 +157,6 @@ function App() {
     );
   };
 
-  // --- Smart Auto-scroll ---
   useEffect(() => {
     if (isNearBottom()) {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -111,7 +164,6 @@ function App() {
     }
   }, [messages]);
 
-  // --- SEND MESSAGE ---
   const sendMessage = (e) => {
     e.preventDefault();
     if (!text.trim()) return;
@@ -121,7 +173,6 @@ function App() {
     socket.emit("stopTyping");
   };
 
-  // --- HANDLE TYPING WITH DEBOUNCE ---
   const handleTyping = (e) => {
     setText(e.target.value);
 
@@ -136,199 +187,126 @@ function App() {
     }
   };
 
-  // --- SCROLL TO BOTTOM (manual trigger for badge) ---
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     setShowNewMessages(false);
   };
 
-  // --- RENDER ---
   if (!username) {
     return (
-      <div style={styles.container}>
-        <h2>{mode === "login" ? "Login" : "Signup"}</h2>
+      <div className="app">
+        <div className="login">
+          <h2>{mode === "login" ? "Login" : "Signup"}</h2>
 
-        <form onSubmit={handleAuth} style={styles.form}>
-          <input
-            type="text"
-            placeholder="Username"
-            value={form.username}
-            onChange={(e) => setForm({ ...form, username: e.target.value })}
-            style={styles.input}
-          />
-
-          {mode === "signup" && (
+          <form onSubmit={handleAuth}>
             <input
-              type="email"
-              placeholder="Email"
-              value={form.email || ""}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
-              style={styles.input}
+              type="text"
+              placeholder="Username"
+              value={form.username}
+              onChange={(e) => setForm({ ...form, username: e.target.value })}
             />
-          )}
 
-          <input
-            type="password"
-            placeholder="Password"
-            value={form.password}
-            onChange={(e) => setForm({ ...form, password: e.target.value })}
-            style={styles.input}
-          />
+            {mode === "signup" && (
+              <input
+                type="email"
+                placeholder="Email"
+                value={form.email || ""}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+              />
+            )}
 
-          <button type="submit" style={styles.button}>
-            {mode === "login" ? "Login" : "Signup"}
-          </button>
-        </form>
+            <input
+              type="password"
+              placeholder="Password"
+              value={form.password}
+              onChange={(e) => setForm({ ...form, password: e.target.value })}
+            />
 
-        <p>
-          {mode === "login" ? "Don't have an account?" : "Already registered?"}{" "}
-          <button
-            onClick={() => setMode(mode === "login" ? "signup" : "login")}
-            style={styles.link}
-          >
-            {mode === "login" ? "Signup" : "Login"}
-          </button>
-        </p>
+            <button type="submit">
+              {mode === "login" ? "Login" : "Signup"}
+            </button>
+          </form>
+
+          <p>
+            {mode === "login" ? "Don't have an account?" : "Already registered?"}{" "}
+            <button
+              onClick={() => setMode(mode === "login" ? "signup" : "login")}
+              className="link"
+            >
+              {mode === "login" ? "Signup" : "Login"}
+            </button>
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div style={styles.container}>
-      <h2 style={styles.header}>
-        Welcome, {username} 👋
-        <button onClick={handleLogout} style={styles.logout}>
+    <div className="chat-container">
+      <div className="chat-header">
+        <h2>Welcome, {username} 👋</h2>
+        <button className="logout" onClick={handleLogout}>
           Logout
         </button>
-      </h2>
-
-      {/* Online users list */}
-      <div style={styles.onlineUsers}>
-        <h4>Online Users</h4>
-        <ul>
-          {onlineUsers.map((user, i) => (
-            <li key={i}>{user}</li>
-          ))}
-        </ul>
       </div>
 
-      {/* Chat messages */}
-      <div style={styles.messages} ref={messagesContainerRef}>
-        {messages.map((msg, i) => (
-          <div key={i} style={styles.message}>
-            <strong>{msg.username}: </strong> {msg.text}
-            <div style={styles.timestamp}>
-              {new Date(msg.createdAt).toLocaleTimeString()}
-            </div>
-          </div>
-        ))}
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Floating "New Messages" badge (bottom-right) */}
-      {showNewMessages && (
-        <div
-          style={{
-            ...styles.newMessages,
-            opacity: showNewMessages ? 1 : 0,
-            transform: showNewMessages ? "scale(1)" : "scale(0.8)",
-          }}
-          onClick={scrollToBottom}
-        >
-          ⬇️ New Messages
+      <div className="chat-main">
+        <div className="sidebar">
+          <h4>Online Users</h4>
+          <ul>
+            {onlineUsers.map((user, i) => (
+              <li key={i}>{user}</li>
+            ))}
+          </ul>
         </div>
-      )}
 
-      {/* Typing indicator */}
-      {typingUser && <div style={styles.typing}>{typingUser} is typing...</div>}
+        <div className="messages-area">
+          <div className="messages" ref={messagesContainerRef}>
+            {Object.entries(groupMessagesByDate(messages)).map(
+              ([dateLabel, msgs], i) => (
+                <div key={i}>
+                  <div className="date-row">
+                    <span className="date-label">{dateLabel}</span>
+                  </div>
+                  {msgs.map((msg, j) => {
+                    const isMine = msg.username === username;
+                    return (
+                      <div key={j} className={`message ${isMine ? "me" : "other"}`}>
+                        <div className="text">
+                          {!isMine && <strong>{msg.username}: </strong>} {msg.text}
+                          <span className="timestamp">
+                            {formatTimestamp(msg.createdAt)}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )
+            )}
+            <div ref={messagesEndRef} />
+          </div>
 
-      {/* Message input */}
-      <form onSubmit={sendMessage} style={styles.form}>
-        <input
-          type="text"
-          value={text}
-          onChange={handleTyping}
-          placeholder="Type a message..."
-          style={styles.input}
-        />
-        <button type="submit" style={styles.button}>
-          Send
-        </button>
-      </form>
+          {showNewMessages && (
+            <div className="newMessages" onClick={scrollToBottom}>
+              ⬇️ New Messages
+            </div>
+          )}
+
+          {typingUser && <div className="typing">{typingUser} is typing...</div>}
+
+          <form className="composer" onSubmit={sendMessage}>
+            <textarea
+              value={text}
+              onChange={handleTyping}
+              placeholder="Type a message..."
+            />
+            <button type="submit">Send</button>
+          </form>
+        </div>
+      </div>
     </div>
   );
 }
 
 export default App;
-
-// --- Inline styles ---
-const styles = {
-  container: {
-    maxWidth: "600px",
-    margin: "20px auto",
-    padding: "10px",
-    border: "1px solid #ccc",
-    borderRadius: "8px",
-    backgroundColor: "#f9f9f9",
-    position: "relative",
-  },
-  header: { textAlign: "center", marginBottom: "10px" },
-  messages: {
-    height: "300px",
-    overflowY: "auto",
-    padding: "10px",
-    border: "1px solid #ddd",
-    borderRadius: "6px",
-    background: "#fff",
-    marginBottom: "10px",
-    position: "relative",
-  },
-  message: {
-    marginBottom: "8px",
-    padding: "6px 8px",
-    borderRadius: "6px",
-    background: "#f1f1f1",
-  },
-  timestamp: { fontSize: "0.7em", color: "#666", marginTop: "2px" },
-  form: { display: "flex", flexDirection: "column", gap: "8px" },
-  input: { padding: "8px", borderRadius: "6px", border: "1px solid #ccc" },
-  button: {
-    padding: "8px 12px",
-    borderRadius: "6px",
-    border: "none",
-    backgroundColor: "#007bff",
-    color: "#fff",
-    cursor: "pointer",
-  },
-  link: { background: "none", border: "none", color: "#007bff", cursor: "pointer" },
-  logout: {
-    marginLeft: "10px",
-    padding: "4px 8px",
-    border: "none",
-    background: "#dc3545",
-    color: "#fff",
-    borderRadius: "4px",
-    cursor: "pointer",
-  },
-  onlineUsers: {
-    marginBottom: "10px",
-    padding: "5px",
-    background: "#eee",
-    borderRadius: "6px",
-  },
-  typing: { fontStyle: "italic", color: "#666", marginTop: "5px" },
-  newMessages: {
-    position: "fixed", // 👈 pinned to viewport
-    bottom: "80px",    // sits above input
-    right: "20px",     // right corner
-    padding: "8px 14px",
-    background: "#007bff",
-    color: "#fff",
-    borderRadius: "20px",
-    textAlign: "center",
-    cursor: "pointer",
-    boxShadow: "0 2px 6px rgba(0,0,0,0.3)",
-    transition: "opacity 0.3s ease, transform 0.3s ease", // fade + bounce
-  },
-};
-
