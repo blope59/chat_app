@@ -7,6 +7,24 @@
   --accent: #5b8def;
   --muted: #666;
   --border: #f0f2f6;
+  --text: #111;
+  --bubble-other: #f5f7ff;
+  --bubble-me: var(--accent);
+  --bubble-other-text: #000;
+  --bubble-me-text: #fff;
+}
+
+body.dark {
+  --bg: #1e1e1e;
+  --card: #2b2b2b;
+  --accent: #5b8def;
+  --muted: #aaa;
+  --border: #444;
+  --text: #f0f0f0;
+  --bubble-other: #3a3a3a;
+  --bubble-me: #5b8def;
+  --bubble-other-text: #eee;
+  --bubble-me-text: #fff;
 }
 
 * { box-sizing: border-box; }
@@ -19,7 +37,7 @@ body {
   margin: 0;
   font-family: Arial, sans-serif;
   background: var(--bg);
-  color: #111;
+  color: var(--text);
 }
 
 /* =========================
@@ -40,17 +58,17 @@ body {
   box-shadow: 0 6px 18px rgba(20, 30, 60, 0.08);
 }
 
-.login h2 {
-  margin: 0 0 12px;
-}
+.login h2 { margin: 0 0 12px; }
 
 .login input {
   padding: 10px;
-  border: 1px solid #e6e9ef;
+  border: 1px solid var(--border);
   border-radius: 8px;
   display: block;
   width: 100%;
   margin-bottom: 10px;
+  background: var(--card);
+  color: var(--text);
 }
 
 .login button {
@@ -91,7 +109,7 @@ body {
   align-items: center;
   padding: 16px;
   border-bottom: 1px solid var(--border);
-  background: #fafafa;
+  background: var(--card);
 }
 
 .logout {
@@ -103,10 +121,21 @@ body {
   cursor: pointer;
 }
 
+/* Dark mode toggle button */
+.toggle-dark {
+  margin-left: 10px;
+  padding: 6px 12px;
+  border: 0;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
 .chat-main {
   display: flex;
   flex: 1;
-  min-height: 0; /* allow children to scroll */
+  min-height: 0;
 }
 
 /* =========================
@@ -116,13 +145,11 @@ body {
   width: 220px;
   padding: 16px;
   border-right: 1px solid var(--border);
-  background: #fbfcff;
+  background: var(--card);
   overflow-y: auto;
 }
 
-.sidebar h4 {
-  margin: 0 0 8px;
-}
+.sidebar h4 { margin: 0 0 8px; }
 
 /* =========================
    Messages Area
@@ -131,7 +158,7 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  min-width: 0; /* prevent overflow */
+  min-width: 0;
 }
 
 .messages {
@@ -140,14 +167,13 @@ body {
   overflow-y: auto;
 }
 
-/* prettier scrollbar (optional) */
 .messages::-webkit-scrollbar { width: 8px; }
 .messages::-webkit-scrollbar-thumb {
   background: #d7dbec;
   border-radius: 8px;
 }
 
-/* ----- Date separators (centered pill) ----- */
+/* Date separators */
 .date-row {
   display: flex;
   justify-content: center;
@@ -164,41 +190,42 @@ body {
   border-radius: 20px;
 }
 
-/* ----- Message rows & bubbles ----- */
+body.dark .date-label {
+  background: #444;
+  color: #eee;
+}
+
+/* Messages */
 .message {
   display: flex;
-  width: 100%;           /* full row so we can push left/right */
+  width: 100%;
   margin-bottom: 12px;
 }
 
 .message.other { justify-content: flex-start; }
-.message.me    { justify-content: flex-end;   }
+.message.me { justify-content: flex-end; }
 
 .message .text {
   max-width: 70%;
   min-width: 120px;
-  padding: 10px 14px 20px; /* extra bottom padding for timestamp */
+  padding: 10px 14px 20px;
   border-radius: 12px;
-  background: #f5f7ff;    /* default gray bubble */
-  position: relative;     /* parent for absolute timestamp */
+  position: relative;
   word-break: break-word;
+  background: var(--bubble-other);
+  color: var(--bubble-other-text);
 }
 
-/* My messages (blue, right) */
 .message.me .text {
-  background: var(--accent);
-  color: #fff;
+  background: var(--bubble-me);
+  color: var(--bubble-me-text);
   border-radius: 16px 16px 0 16px;
 }
 
-/* Other messages (gray, left) */
 .message.other .text {
-  background: #f5f7ff;
-  color: #000;
   border-radius: 16px 16px 16px 0;
 }
 
-/* Timestamp sits bottom-right inside bubble */
 .timestamp {
   position: absolute;
   bottom: 4px;
@@ -207,27 +234,26 @@ body {
   opacity: 0.75;
 }
 
-/* darker timestamp for non-blue bubbles */
-.message.other .timestamp { color: #666; }
-
 /* =========================
-   Composer / Typing / New Messages
+   Composer / Typing / Badge
    ========================= */
 .composer {
   display: flex;
   padding: 12px;
   border-top: 1px solid var(--border);
   gap: 8px;
-  background: #fff;
+  background: var(--card);
 }
 
 .composer textarea {
   flex: 1;
   padding: 10px;
   border-radius: 8px;
-  border: 1px solid #e6e9ef;
+  border: 1px solid var(--border);
   min-height: 48px;
   resize: none;
+  background: var(--card);
+  color: var(--text);
 }
 
 .composer button {
@@ -245,7 +271,6 @@ body {
   padding: 4px 12px;
 }
 
-/* floating "new messages" badge */
 .newMessages {
   position: fixed;
   bottom: 80px;
@@ -260,9 +285,7 @@ body {
   transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
-/* =========================
-   Responsive tweaks
-   ========================= */
+/* Responsive */
 @media (max-width: 840px) {
   .sidebar { display: none; }
   .chat-container { height: 94vh; }
@@ -271,3 +294,17 @@ body {
 @media (max-width: 520px) {
   .message .text { max-width: 85%; }
 }
+
+/* Smooth transitions for theme switch */
+body,
+.chat-container,
+.chat-header,
+.sidebar,
+.messages,
+.message .text,
+.composer,
+.date-label {
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+

@@ -71,6 +71,9 @@ function App() {
   const [text, setText] = useState("");
   const [form, setForm] = useState({ username: "", email: "", password: "" });
   const [mode, setMode] = useState("login");
+  const [darkMode, setDarkMode] = useState(
+    localStorage.getItem("darkMode") === "true"
+  );
 
   const [onlineUsers, setOnlineUsers] = useState([]);
   const [typingUser, setTypingUser] = useState(null);
@@ -89,6 +92,11 @@ function App() {
       socket.emit("join", storedUser);
     }
   }, []);
+
+  useEffect(() => {
+    document.body.classList.toggle("dark", darkMode);
+    localStorage.setItem("darkMode", darkMode);
+  }, [darkMode]);
 
   const handleAuth = async (e) => {
     e.preventDefault();
@@ -245,9 +253,14 @@ function App() {
     <div className="chat-container">
       <div className="chat-header">
         <h2>Welcome, {username} 👋</h2>
-        <button className="logout" onClick={handleLogout}>
-          Logout
-        </button>
+        <div>
+          <button className="toggle-dark" onClick={() => setDarkMode(!darkMode)}>
+            {darkMode ? "☀️ Light" : "🌙 Dark"}
+          </button>
+          <button className="logout" onClick={handleLogout}>
+            Logout
+          </button>
+        </div>
       </div>
 
       <div className="chat-main">
@@ -310,3 +323,7 @@ function App() {
 }
 
 export default App;
+
+
+
+
