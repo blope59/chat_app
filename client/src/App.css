@@ -214,16 +214,21 @@ body.dark .date-label {
   word-break: break-word;
   background: var(--bubble-other);
   color: var(--bubble-other-text);
+  opacity: 0;
+  transform: translateX(0);
+  animation: fadeIn 0.4s ease forwards;
 }
 
 .message.me .text {
   background: var(--bubble-me);
   color: var(--bubble-me-text);
   border-radius: 16px 16px 0 16px;
+  animation: slideInRight 0.4s ease forwards;
 }
 
 .message.other .text {
   border-radius: 16px 16px 16px 0;
+  animation: slideInLeft 0.4s ease forwards;
 }
 
 .timestamp {
@@ -232,6 +237,22 @@ body.dark .date-label {
   right: 10px;
   font-size: 0.7em;
   opacity: 0.75;
+}
+
+/* Animations */
+@keyframes slideInRight {
+  from { transform: translateX(40px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slideInLeft {
+  from { transform: translateX(-40px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 /* =========================
@@ -306,5 +327,6 @@ body,
 .date-label {
   transition: background-color 0.3s ease, color 0.3s ease;
 }
+
 
 

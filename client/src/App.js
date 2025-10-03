@@ -6,6 +6,7 @@ import "./App.css";
 const SERVER_URL = process.env.REACT_APP_SERVER_URL || "http://localhost:3001";
 const socket = io(SERVER_URL, { transports: ["websocket"] });
 
+// timestamp formatter
 function formatTimestamp(dateString) {
   const date = new Date(dateString);
   const now = new Date();
@@ -139,7 +140,6 @@ function App() {
   useEffect(() => {
     socket.on("receiveMessage", (message) => {
       setMessages((prev) => [...prev, message]);
-
       if (!isNearBottom()) {
         setShowNewMessages(true);
       }
@@ -183,12 +183,9 @@ function App() {
 
   const handleTyping = (e) => {
     setText(e.target.value);
-
     if (username) {
       socket.emit("typing", username);
-
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-
       typingTimeoutRef.current = setTimeout(() => {
         socket.emit("stopTyping");
       }, 1000);
@@ -205,7 +202,6 @@ function App() {
       <div className="app">
         <div className="login">
           <h2>{mode === "login" ? "Login" : "Signup"}</h2>
-
           <form onSubmit={handleAuth}>
             <input
               type="text"
@@ -213,7 +209,6 @@ function App() {
               value={form.username}
               onChange={(e) => setForm({ ...form, username: e.target.value })}
             />
-
             {mode === "signup" && (
               <input
                 type="email"
@@ -222,19 +217,16 @@ function App() {
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
               />
             )}
-
             <input
               type="password"
               placeholder="Password"
               value={form.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })}
             />
-
             <button type="submit">
               {mode === "login" ? "Login" : "Signup"}
             </button>
           </form>
-
           <p>
             {mode === "login" ? "Don't have an account?" : "Already registered?"}{" "}
             <button
@@ -323,7 +315,5 @@ function App() {
 }
 
 export default App;
-
-
 
 
