@@ -27,9 +27,13 @@ body.dark {
   --bubble-me-text: #fff;
 }
 
-* { box-sizing: border-box; }
+* {
+  box-sizing: border-box;
+}
 
-html, body, #root {
+html,
+body,
+#root {
   height: 100%;
 }
 
@@ -58,7 +62,9 @@ body {
   box-shadow: 0 6px 18px rgba(20, 30, 60, 0.08);
 }
 
-.login h2 { margin: 0 0 12px; }
+.login h2 {
+  margin: 0 0 12px;
+}
 
 .login input {
   padding: 10px;
@@ -121,7 +127,6 @@ body {
   cursor: pointer;
 }
 
-/* Dark mode toggle button */
 .toggle-dark {
   margin-left: 10px;
   padding: 6px 12px;
@@ -149,7 +154,9 @@ body {
   overflow-y: auto;
 }
 
-.sidebar h4 { margin: 0 0 8px; }
+.sidebar h4 {
+  margin: 0 0 8px;
+}
 
 /* =========================
    Messages Area
@@ -159,6 +166,7 @@ body {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  position: relative; /* important for newMessages */
 }
 
 .messages {
@@ -167,13 +175,14 @@ body {
   overflow-y: auto;
 }
 
-.messages::-webkit-scrollbar { width: 8px; }
+.messages::-webkit-scrollbar {
+  width: 8px;
+}
 .messages::-webkit-scrollbar-thumb {
   background: #d7dbec;
   border-radius: 8px;
 }
 
-/* Date separators */
 .date-row {
   display: flex;
   justify-content: center;
@@ -202,8 +211,12 @@ body.dark .date-label {
   margin-bottom: 12px;
 }
 
-.message.other { justify-content: flex-start; }
-.message.me { justify-content: flex-end; }
+.message.other {
+  justify-content: flex-start;
+}
+.message.me {
+  justify-content: flex-end;
+}
 
 .message .text {
   max-width: 70%;
@@ -217,6 +230,8 @@ body.dark .date-label {
   opacity: 0;
   transform: translateX(0);
   animation: fadeIn 0.4s ease forwards;
+  display: inline-flex;
+  flex-direction: column;
 }
 
 .message.me .text {
@@ -241,18 +256,34 @@ body.dark .date-label {
 
 /* Animations */
 @keyframes slideInRight {
-  from { transform: translateX(40px); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
+  from {
+    transform: translateX(40px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 
 @keyframes slideInLeft {
-  from { transform: translateX(-40px); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
+  from {
+    transform: translateX(-40px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 /* =========================
@@ -292,9 +323,12 @@ body.dark .date-label {
   padding: 4px 12px;
 }
 
+/* =========================
+   New Messages Button
+   ========================= */
 .newMessages {
-  position: fixed;
-  bottom: 80px;
+  position: absolute;
+  bottom: 70px; /* sits above composer */
   right: 20px;
   padding: 8px 14px;
   background: var(--accent);
@@ -302,18 +336,33 @@ body.dark .date-label {
   border-radius: 20px;
   text-align: center;
   cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-  transition: opacity 0.3s ease, transform 0.3s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  transition: opacity 0.5s ease;
+  z-index: 10;
+  opacity: 1;
 }
 
-/* Responsive */
+.newMessages.hide {
+  opacity: 0; /* smooth fade */
+  pointer-events: none;
+}
+
+/* =========================
+   Responsive
+   ========================= */
 @media (max-width: 840px) {
-  .sidebar { display: none; }
-  .chat-container { height: 94vh; }
+  .sidebar {
+    display: none;
+  }
+  .chat-container {
+    height: 94vh;
+  }
 }
 
 @media (max-width: 520px) {
-  .message .text { max-width: 85%; }
+  .message .text {
+    max-width: 85%;
+  }
 }
 
 /* Smooth transitions for theme switch */
@@ -327,6 +376,52 @@ body,
 .date-label {
   transition: background-color 0.3s ease, color 0.3s ease;
 }
+
+/* Animated theme toggle */
+.toggle-dark {
+  margin-right: 10px;
+  transition: background 0.3s ease, color 0.3s ease;
+  position: relative;
+}
+
+.toggle-dark::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: -32px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--card);
+  color: var(--text);
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 0.75em;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  transition: opacity 0.3s ease;
+}
+
+.toggle-dark:hover::after {
+  opacity: 1;
+}
+
+.mode-icon {
+  display: inline-block;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.mode-icon.fade-in {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.mode-icon.fade-out {
+  opacity: 0.7;
+  transform: translateY(-2px);
+}
+
+
 
 
 

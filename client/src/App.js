@@ -6,63 +6,9 @@ import "./App.css";
 const SERVER_URL = process.env.REACT_APP_SERVER_URL || "http://localhost:3001";
 const socket = io(SERVER_URL, { transports: ["websocket"] });
 
-// timestamp formatter
 function formatTimestamp(dateString) {
   const date = new Date(dateString);
-  const now = new Date();
-
-  const isToday =
-    date.getDate() === now.getDate() &&
-    date.getMonth() === now.getMonth() &&
-    date.getFullYear() === now.getFullYear();
-
-  if (isToday) {
-    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  }
-
-  return date.toLocaleDateString([], {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function groupMessagesByDate(messages) {
-  const groups = {};
-  const today = new Date();
-  const yesterday = new Date();
-  yesterday.setDate(today.getDate() - 1);
-
-  for (const msg of messages) {
-    const msgDate = new Date(msg.createdAt);
-    let label;
-
-    if (
-      msgDate.getDate() === today.getDate() &&
-      msgDate.getMonth() === today.getMonth() &&
-      msgDate.getFullYear() === today.getFullYear()
-    ) {
-      label = "Today";
-    } else if (
-      msgDate.getDate() === yesterday.getDate() &&
-      msgDate.getMonth() === yesterday.getMonth() &&
-      msgDate.getFullYear() === yesterday.getFullYear()
-    ) {
-      label = "Yesterday";
-    } else {
-      label = msgDate.toLocaleDateString([], {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      });
-    }
-
-    if (!groups[label]) groups[label] = [];
-    groups[label].push(msg);
-  }
-
-  return groups;
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
 function App() {
@@ -72,33 +18,47 @@ function App() {
   const [text, setText] = useState("");
   const [form, setForm] = useState({ username: "", email: "", password: "" });
   const [mode, setMode] = useState("login");
-  const [darkMode, setDarkMode] = useState(
-    localStorage.getItem("darkMode") === "true"
-  );
-
   const [onlineUsers, setOnlineUsers] = useState([]);
   const [typingUser, setTypingUser] = useState(null);
+
+  // 🌙 Dark Mode
+  const [darkMode, setDarkMode] = useState(false);
+
+  // 🔔 New Messages notification
   const [showNewMessages, setShowNewMessages] = useState(false);
+  const [fadeOut, setFadeOut] = useState(false);
+  const [newMsgCount, setNewMsgCount] = useState(0);
 
   const typingTimeoutRef = useRef(null);
   const messagesEndRef = useRef(null);
-  const messagesContainerRef = useRef(null);
+  const hideTimerRef = useRef(null);
 
+  // --- Load session + dark mode ---
   useEffect(() => {
     const storedUser = localStorage.getItem("chatUser");
     const storedToken = localStorage.getItem("chatToken");
+    const storedTheme = localStorage.getItem("darkMode");
+
     if (storedUser && storedToken) {
       setUsername(storedUser);
       setToken(storedToken);
-      socket.emit("join", storedUser);
+      socket.emit("joinRoom", { username: storedUser });
+    }
+
+    if (storedTheme === "true") {
+      setDarkMode(true);
+      document.body.classList.add("dark");
     }
   }, []);
 
-  useEffect(() => {
-    document.body.classList.toggle("dark", darkMode);
-    localStorage.setItem("darkMode", darkMode);
-  }, [darkMode]);
+  const toggleDarkMode = () => {
+    const newMode = !darkMode;
+    setDarkMode(newMode);
+    document.body.classList.toggle("dark", newMode);
+    localStorage.setItem("darkMode", newMode);
+  };
 
+  // --- AUTH ---
   const handleAuth = async (e) => {
     e.preventDefault();
     try {
@@ -111,7 +71,7 @@ function App() {
       localStorage.setItem("chatUser", res.data.username);
       localStorage.setItem("chatToken", res.data.token);
 
-      socket.emit("join", res.data.username);
+      socket.emit("joinRoom", { username: res.data.username });
     } catch (err) {
       alert(err.response?.data?.error || "Auth failed");
     }
@@ -124,12 +84,16 @@ function App() {
     localStorage.removeItem("chatToken");
   };
 
+  // --- LOAD MESSAGES ---
   useEffect(() => {
     if (!username) return;
     const fetchMessages = async () => {
       try {
         const res = await axios.get(`${SERVER_URL}/messages`);
         setMessages(res.data);
+        setTimeout(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        }, 100);
       } catch (err) {
         console.error("Failed to fetch messages:", err);
       }
@@ -137,11 +101,25 @@ function App() {
     fetchMessages();
   }, [username]);
 
+  // --- SOCKET ---
   useEffect(() => {
     socket.on("receiveMessage", (message) => {
       setMessages((prev) => [...prev, message]);
-      if (!isNearBottom()) {
-        setShowNewMessages(true);
+
+      if (message.username !== username) {
+        const messagesDiv = messagesEndRef.current?.parentNode;
+        if (messagesDiv) {
+          const { scrollTop, clientHeight, scrollHeight } = messagesDiv;
+          if (scrollHeight - scrollTop > clientHeight + 50) {
+            setNewMsgCount((prev) => prev + 1);
+            setShowNewMessages(true);
+            setFadeOut(false);
+          } else {
+            messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+          }
+        }
+      } else {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
       }
     });
 
@@ -155,28 +133,42 @@ function App() {
       socket.off("typing");
       socket.off("stopTyping");
     };
-  }, []);
+  }, [username]);
 
-  const isNearBottom = () => {
-    const container = messagesContainerRef.current;
-    if (!container) return true;
-    return (
-      container.scrollHeight - container.scrollTop - container.clientHeight < 100
-    );
+  // --- AUTO-HIDE TIMER (separate useEffect) ---
+  useEffect(() => {
+    if (showNewMessages) {
+      if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+
+      hideTimerRef.current = setTimeout(() => {
+        setFadeOut(true);
+        setTimeout(() => {
+          setShowNewMessages(false);
+          setNewMsgCount(0);
+        }, 500);
+      }, 5000);
+    }
+    return () => {
+      if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    };
+  }, [showNewMessages]);
+
+  // --- SCROLL HANDLER ---
+  const handleScroll = (e) => {
+    const { scrollTop, clientHeight, scrollHeight } = e.target;
+    if (scrollHeight - scrollTop <= clientHeight + 50) {
+      setShowNewMessages(false);
+      setNewMsgCount(0);
+      if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    }
   };
 
-  useEffect(() => {
-    if (isNearBottom()) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-      setShowNewMessages(false);
-    }
-  }, [messages]);
-
+  // --- SEND MESSAGE ---
   const sendMessage = (e) => {
     e.preventDefault();
     if (!text.trim()) return;
 
-    socket.emit("sendMessage", { username, text, room: "global" });
+    socket.emit("sendMessage", { username, text });
     setText("");
     socket.emit("stopTyping");
   };
@@ -192,11 +184,7 @@ function App() {
     }
   };
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    setShowNewMessages(false);
-  };
-
+  // --- RENDER ---
   if (!username) {
     return (
       <div className="app">
@@ -223,9 +211,7 @@ function App() {
               value={form.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })}
             />
-            <button type="submit">
-              {mode === "login" ? "Login" : "Signup"}
-            </button>
+            <button type="submit">{mode === "login" ? "Login" : "Signup"}</button>
           </form>
           <p>
             {mode === "login" ? "Don't have an account?" : "Already registered?"}{" "}
@@ -246,8 +232,14 @@ function App() {
       <div className="chat-header">
         <h2>Welcome, {username} 👋</h2>
         <div>
-          <button className="toggle-dark" onClick={() => setDarkMode(!darkMode)}>
-            {darkMode ? "☀️ Light" : "🌙 Dark"}
+          <button
+            className="toggle-dark"
+            onClick={toggleDarkMode}
+            data-tooltip={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+          >
+            <span className={`mode-icon ${darkMode ? "fade-out" : "fade-in"}`}>
+              {darkMode ? "☀️ Light" : "🌙 Dark"}
+            </span>
           </button>
           <button className="logout" onClick={handleLogout}>
             Logout
@@ -258,47 +250,44 @@ function App() {
       <div className="chat-main">
         <div className="sidebar">
           <h4>Online Users</h4>
-          <ul>
-            {onlineUsers.map((user, i) => (
-              <li key={i}>{user}</li>
-            ))}
-          </ul>
+          <ul>{onlineUsers.map((user, i) => <li key={i}>{user}</li>)}</ul>
         </div>
 
         <div className="messages-area">
-          <div className="messages" ref={messagesContainerRef}>
-            {Object.entries(groupMessagesByDate(messages)).map(
-              ([dateLabel, msgs], i) => (
-                <div key={i}>
-                  <div className="date-row">
-                    <span className="date-label">{dateLabel}</span>
+          <div className="messages" onScroll={handleScroll}>
+            {messages.map((msg, i) => {
+              const isMine = msg.username === username;
+              return (
+                <div key={i} className={`message ${isMine ? "me" : "other"}`}>
+                  <div className="text">
+                    {!isMine && <strong>{msg.username}: </strong>} {msg.text}
+                    <span className="timestamp">
+                      {formatTimestamp(msg.createdAt)}
+                    </span>
                   </div>
-                  {msgs.map((msg, j) => {
-                    const isMine = msg.username === username;
-                    return (
-                      <div key={j} className={`message ${isMine ? "me" : "other"}`}>
-                        <div className="text">
-                          {!isMine && <strong>{msg.username}: </strong>} {msg.text}
-                          <span className="timestamp">
-                            {formatTimestamp(msg.createdAt)}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
                 </div>
-              )
-            )}
+              );
+            })}
             <div ref={messagesEndRef} />
           </div>
 
+          {typingUser && <div className="typing">{typingUser} is typing...</div>}
+
           {showNewMessages && (
-            <div className="newMessages" onClick={scrollToBottom}>
-              ⬇️ New Messages
+            <div
+              className={`newMessages ${fadeOut ? "hide" : ""}`}
+              onClick={() => {
+                messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+                setShowNewMessages(false);
+                setNewMsgCount(0);
+                if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+              }}
+            >
+              {newMsgCount > 1
+                ? `${newMsgCount} New Messages ↓`
+                : "New Message ↓"}
             </div>
           )}
-
-          {typingUser && <div className="typing">{typingUser} is typing...</div>}
 
           <form className="composer" onSubmit={sendMessage}>
             <textarea
@@ -315,5 +304,3 @@ function App() {
 }
 
 export default App;
-
-

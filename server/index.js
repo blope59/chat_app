@@ -36,36 +36,24 @@ mongoose.connect(process.env.MONGO_URI, {
   .catch(err => console.error("❌ MongoDB error:", err));
 
 // --- AUTH ROUTES ---
-
 app.post("/signup", async (req, res) => {
   try {
-    console.log("Signup received:", req.body); // Debugging line
-
     const { username, email, password } = req.body;
-
     if (!username || !email || !password) {
       return res.status(400).json({ error: "All fields are required" });
     }
 
-    // Check if username already exists
     const existingUser = await User.findOne({ username });
-    if (existingUser) {
-      return res.status(400).json({ error: "Username already exists" });
-    }
+    if (existingUser) return res.status(400).json({ error: "Username already exists" });
 
-    // Check if email already exists
     const existingEmail = await User.findOne({ email });
-    if (existingEmail) {
-      return res.status(400).json({ error: "Email already in use" });
-    }
+    if (existingEmail) return res.status(400).json({ error: "Email already in use" });
 
     const hashedPw = await bcrypt.hash(password, 10);
     const user = new User({ username, email, password: hashedPw });
     await user.save();
 
-    // sign JWT
     const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: "1h" });
-
     res.json({ token, username: user.username });
   } catch (err) {
     console.error("Signup error:", err);
@@ -73,26 +61,15 @@ app.post("/signup", async (req, res) => {
   }
 });
 
-// --- Login Route ---
 app.post("/login", async (req, res) => {
   try {
     const { username, password } = req.body;
-
-    // Check if they typed an email (contains "@")
-    const query = username.includes("@")
-      ? { email: username }
-      : { username: username };
-
+    const query = username.includes("@") ? { email: username } : { username };
     const user = await User.findOne(query);
 
-    if (!user) {
-      return res.status(400).json({ error: "Invalid credentials" });
-    }
-
+    if (!user) return res.status(400).json({ error: "Invalid credentials" });
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(400).json({ error: "Invalid credentials" });
-    }
+    if (!isMatch) return res.status(400).json({ error: "Invalid credentials" });
 
     const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: "1h" });
     res.json({ token, username: user.username });
@@ -102,11 +79,10 @@ app.post("/login", async (req, res) => {
   }
 });
 
-// --- MESSAGE ROUTES ---
-app.get("/messages/:room?", async (req, res) => {
+// --- MESSAGE ROUTES (always global) ---
+app.get("/messages", async (req, res) => {
   try {
-    const room = req.params.room || "global";
-    const messages = await Message.find({ room }).sort({ createdAt: 1 });
+    const messages = await Message.find({ room: "global" }).sort({ createdAt: 1 });
     res.json(messages);
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch messages" });
@@ -119,40 +95,45 @@ let onlineUsers = new Map();
 io.on("connection", (socket) => {
   console.log("🟢 New client connected:", socket.id);
 
-  // When a user joins, store them
-  socket.on("join", (username) => {
-    onlineUsers.set(socket.id, username);
-    io.emit("onlineUsers", Array.from(onlineUsers.values()));
+  // Join global room
+  socket.on("joinRoom", ({ username }) => {
+    const room = "global";
+    socket.join(room);
+    onlineUsers.set(socket.id, { username, room });
+    io.to(room).emit(
+      "onlineUsers",
+      Array.from(onlineUsers.values()).map(u => u.username)
+    );
   });
 
-  // User typing
+  // Typing
   socket.on("typing", (username) => {
-    console.log(username, "is typing...");
-    socket.broadcast.emit("typing", username); // notify all other users
+    socket.to("global").emit("typing", username);
   });
 
   socket.on("stopTyping", () => {
-    socket.broadcast.emit("stopTyping"); // clear indicator for others
+    socket.to("global").emit("stopTyping");
   });
 
-  // On disconnect, remove them
-  socket.on("disconnect", () => {
-    console.log("🔴 Client disconnected:", socket.id);
-    onlineUsers.delete(socket.id);
-    io.emit("onlineUsers", Array.from(onlineUsers.values()));
-  });
-
-  // Handle chat messages
-  socket.on("sendMessage", async (data) => {
+  // Messages
+  socket.on("sendMessage", async ({ username, text }) => {
     try {
-      const { room = "global", username, text } = data;
-      const message = new Message({ room, username, text });
+      const message = new Message({ room: "global", username, text });
       await message.save();
-
-      io.emit("receiveMessage", message);
+      io.to("global").emit("receiveMessage", message);
     } catch (err) {
       console.error("Error saving message:", err);
     }
+  });
+
+  // Disconnect
+  socket.on("disconnect", () => {
+    console.log("🔴 Client disconnected:", socket.id);
+    onlineUsers.delete(socket.id);
+    io.to("global").emit(
+      "onlineUsers",
+      Array.from(onlineUsers.values()).map(u => u.username)
+    );
   });
 });
 
@@ -160,4 +141,3 @@ io.on("connection", (socket) => {
 server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
-
