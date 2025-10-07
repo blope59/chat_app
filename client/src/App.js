@@ -11,6 +11,28 @@ function formatTimestamp(dateString) {
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+// ✅ SVG Check Components
+const SingleCheck = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    className="tick-icon single"
+    viewBox="0 0 24 24"
+  >
+    <path d="M4 12l5 5L20 7" fill="none" stroke="gray" strokeWidth="2" />
+  </svg>
+);
+
+const DoubleCheck = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    className="tick-icon double"
+    viewBox="0 0 24 24"
+  >
+    <path d="M3 12l5 5L20 5" fill="none" stroke="#00e5ff" strokeWidth="2" />
+    <path d="M9 12l5 5L23 5" fill="none" stroke="#00e5ff" strokeWidth="2" />
+  </svg>
+);
+
 function App() {
   const [username, setUsername] = useState(null);
   const [token, setToken] = useState(null);
@@ -20,11 +42,7 @@ function App() {
   const [mode, setMode] = useState("login");
   const [onlineUsers, setOnlineUsers] = useState([]);
   const [typingUser, setTypingUser] = useState(null);
-
-  // 🌙 Dark Mode
   const [darkMode, setDarkMode] = useState(false);
-
-  // 🔔 New Messages notification
   const [showNewMessages, setShowNewMessages] = useState(false);
   const [fadeOut, setFadeOut] = useState(false);
   const [newMsgCount, setNewMsgCount] = useState(0);
@@ -32,6 +50,17 @@ function App() {
   const typingTimeoutRef = useRef(null);
   const messagesEndRef = useRef(null);
   const hideTimerRef = useRef(null);
+
+  // ✅ Smooth reliable scroll-to-bottom function
+  const scrollToBottom = () => {
+    const messagesDiv = messagesEndRef.current?.parentNode;
+    if (messagesDiv) {
+      messagesDiv.scrollTo({
+        top: messagesDiv.scrollHeight,
+        behavior: "smooth",
+      });
+    }
+  };
 
   // --- Load session + dark mode ---
   useEffect(() => {
@@ -67,10 +96,8 @@ function App() {
 
       setUsername(res.data.username);
       setToken(res.data.token);
-
       localStorage.setItem("chatUser", res.data.username);
       localStorage.setItem("chatToken", res.data.token);
-
       socket.emit("joinRoom", { username: res.data.username });
     } catch (err) {
       alert(err.response?.data?.error || "Auth failed");
@@ -91,9 +118,7 @@ function App() {
       try {
         const res = await axios.get(`${SERVER_URL}/messages`);
         setMessages(res.data);
-        setTimeout(() => {
-          messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-        }, 100);
+        setTimeout(scrollToBottom, 50); // ✅ ensures we scroll after render
       } catch (err) {
         console.error("Failed to fetch messages:", err);
       }
@@ -101,26 +126,42 @@ function App() {
     fetchMessages();
   }, [username]);
 
-  // --- SOCKET ---
+  // --- SOCKET LISTENERS ---
   useEffect(() => {
     socket.on("receiveMessage", (message) => {
       setMessages((prev) => [...prev, message]);
 
-      if (message.username !== username) {
+      if (message.username === username) {
+        // ✅ Scroll after new message renders
+        setTimeout(scrollToBottom, 60);
+      } else {
         const messagesDiv = messagesEndRef.current?.parentNode;
         if (messagesDiv) {
           const { scrollTop, clientHeight, scrollHeight } = messagesDiv;
-          if (scrollHeight - scrollTop > clientHeight + 50) {
+          const isNearBottom = scrollHeight - scrollTop <= clientHeight + 50;
+
+          if (!isNearBottom) {
             setNewMsgCount((prev) => prev + 1);
             setShowNewMessages(true);
             setFadeOut(false);
           } else {
-            messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+            setTimeout(scrollToBottom, 60);
           }
         }
-      } else {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
       }
+    });
+
+    socket.on("messageRead", (updatedMessages) => {
+      setMessages((prevMessages) => {
+        const updates = new Map(updatedMessages.map((m) => [m._id, m]));
+        return prevMessages.map((msg) => {
+          const updated = updates.get(msg._id);
+          if (updated) {
+            return { ...msg, readBy: [...updated.readBy] };
+          }
+          return msg;
+        });
+      });
     });
 
     socket.on("onlineUsers", (users) => setOnlineUsers(users));
@@ -129,17 +170,17 @@ function App() {
 
     return () => {
       socket.off("receiveMessage");
+      socket.off("messageRead");
       socket.off("onlineUsers");
       socket.off("typing");
       socket.off("stopTyping");
     };
   }, [username]);
 
-  // --- AUTO-HIDE TIMER (separate useEffect) ---
+  // --- AUTO-HIDE TIMER ---
   useEffect(() => {
     if (showNewMessages) {
       if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
-
       hideTimerRef.current = setTimeout(() => {
         setFadeOut(true);
         setTimeout(() => {
@@ -153,24 +194,23 @@ function App() {
     };
   }, [showNewMessages]);
 
-  // --- SCROLL HANDLER ---
   const handleScroll = (e) => {
     const { scrollTop, clientHeight, scrollHeight } = e.target;
     if (scrollHeight - scrollTop <= clientHeight + 50) {
       setShowNewMessages(false);
       setNewMsgCount(0);
       if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+      socket.emit("markAsRead", { username });
     }
   };
 
-  // --- SEND MESSAGE ---
   const sendMessage = (e) => {
     e.preventDefault();
     if (!text.trim()) return;
-
     socket.emit("sendMessage", { username, text });
     setText("");
     socket.emit("stopTyping");
+    setTimeout(scrollToBottom, 50); // ✅ ensures full bubble visible
   };
 
   const handleTyping = (e) => {
@@ -184,7 +224,6 @@ function App() {
     }
   };
 
-  // --- RENDER ---
   if (!username) {
     return (
       <div className="app">
@@ -232,14 +271,8 @@ function App() {
       <div className="chat-header">
         <h2>Welcome, {username} 👋</h2>
         <div>
-          <button
-            className="toggle-dark"
-            onClick={toggleDarkMode}
-            data-tooltip={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
-          >
-            <span className={`mode-icon ${darkMode ? "fade-out" : "fade-in"}`}>
-              {darkMode ? "☀️ Light" : "🌙 Dark"}
-            </span>
+          <button className="toggle-dark" onClick={toggleDarkMode}>
+            {darkMode ? "☀️ Light" : "🌙 Dark"}
           </button>
           <button className="logout" onClick={handleLogout}>
             Logout
@@ -257,12 +290,15 @@ function App() {
           <div className="messages" onScroll={handleScroll}>
             {messages.map((msg, i) => {
               const isMine = msg.username === username;
+              const readers = msg.readBy?.filter((u) => u !== msg.username) || [];
+
               return (
-                <div key={i} className={`message ${isMine ? "me" : "other"}`}>
+                <div key={msg._id || i} className={`message ${isMine ? "me" : "other"}`}>
                   <div className="text">
                     {!isMine && <strong>{msg.username}: </strong>} {msg.text}
                     <span className="timestamp">
                       {formatTimestamp(msg.createdAt)}
+                      {isMine && (readers.length ? <DoubleCheck /> : <SingleCheck />)}
                     </span>
                   </div>
                 </div>
@@ -277,7 +313,7 @@ function App() {
             <div
               className={`newMessages ${fadeOut ? "hide" : ""}`}
               onClick={() => {
-                messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+                scrollToBottom();
                 setShowNewMessages(false);
                 setNewMsgCount(0);
                 if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
@@ -304,3 +340,8 @@ function App() {
 }
 
 export default App;
+
+
+
+
+

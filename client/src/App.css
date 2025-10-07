@@ -6,7 +6,7 @@
   --card: #ffffff;
   --accent: #5b8def;
   --muted: #666;
-  --border: #f0f2f6;
+  --border: #f0f2f6;  
   --text: #111;
   --bubble-other: #f5f7ff;
   --bubble-me: var(--accent);
@@ -14,6 +14,7 @@
   --bubble-me-text: #fff;
 }
 
+/* 🌙 Dark Mode */
 body.dark {
   --bg: #1e1e1e;
   --card: #2b2b2b;
@@ -27,64 +28,67 @@ body.dark {
   --bubble-me-text: #fff;
 }
 
-* {
-  box-sizing: border-box;
-}
-
-html,
-body,
-#root {
-  height: 100%;
-}
-
+/* =========================
+   Global Layout
+   ========================= */
 body {
-  margin: 0;
-  font-family: Arial, sans-serif;
+  font-family: "Inter", sans-serif;
   background: var(--bg);
+  margin: 0;
   color: var(--text);
+  transition: background 0.3s, color 0.3s;
+}
+
+.app {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
 }
 
 /* =========================
    Auth (Login/Signup)
    ========================= */
-.app {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-}
-
 .login {
-  width: 420px;
   background: var(--card);
-  padding: 24px;
-  border-radius: 12px;
-  box-shadow: 0 6px 18px rgba(20, 30, 60, 0.08);
+  padding: 30px;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  width: 320px;
+  text-align: center;
 }
 
 .login h2 {
-  margin: 0 0 12px;
+  margin-bottom: 20px;
+}
+
+.login form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .login input {
   padding: 10px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  display: block;
-  width: 100%;
-  margin-bottom: 10px;
-  background: var(--card);
+  outline: none;
+  background: var(--bg);
   color: var(--text);
 }
 
 .login button {
-  padding: 10px;
-  border: 0;
   background: var(--accent);
-  color: #fff;
+  color: white;
+  border: none;
+  padding: 10px;
   border-radius: 8px;
   cursor: pointer;
-  width: 100%;
+  transition: opacity 0.2s;
+}
+
+.login button:hover {
+  opacity: 0.85;
 }
 
 .link {
@@ -92,70 +96,83 @@ body {
   border: none;
   color: var(--accent);
   cursor: pointer;
+  text-decoration: underline;
+  font-size: 0.9em;
 }
 
 /* =========================
-   Chat Shell
+   Chat Layout
    ========================= */
 .chat-container {
-  width: 100%;
-  max-width: 1000px;
-  height: 92vh;
-  background: var(--card);
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 8px 30px rgba(20, 30, 60, 0.08);
   display: flex;
   flex-direction: column;
+  height: 100vh;
 }
 
 .chat-header {
+  background: var(--card);
+  padding: 15px 20px;
+  border-bottom: 1px solid var(--border);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px;
-  border-bottom: 1px solid var(--border);
-  background: var(--card);
 }
 
-.logout {
-  padding: 6px 12px;
-  border: 0;
-  background: #dc3545;
-  color: #fff;
-  border-radius: 6px;
-  cursor: pointer;
+.chat-header h2 {
+  margin: 0;
+  font-size: 1.2em;
 }
 
-.toggle-dark {
-  margin-left: 10px;
-  padding: 6px 12px;
-  border: 0;
+.chat-header button {
+  margin-left: 8px;
   background: var(--accent);
-  color: #fff;
+  color: white;
+  border: none;
+  padding: 8px 12px;
   border-radius: 6px;
   cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.chat-header button:hover {
+  opacity: 0.85;
 }
 
 .chat-main {
   display: flex;
   flex: 1;
-  min-height: 0;
+  overflow: hidden;
 }
 
 /* =========================
-   Sidebar
+   Sidebar (Online Users)
    ========================= */
 .sidebar {
   width: 220px;
-  padding: 16px;
-  border-right: 1px solid var(--border);
   background: var(--card);
+  border-right: 1px solid var(--border);
+  padding: 15px;
+  box-sizing: border-box;
   overflow-y: auto;
 }
 
 .sidebar h4 {
-  margin: 0 0 8px;
+  margin: 0 0 10px;
+  font-size: 1.1em;
+}
+
+.sidebar ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.sidebar li {
+  padding: 6px 8px;
+  border-radius: 6px;
+  margin-bottom: 5px;
+  background: var(--bubble-other);
+  color: var(--bubble-other-text);
 }
 
 /* =========================
@@ -165,260 +182,292 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  min-width: 0;
-  position: relative; /* important for newMessages */
+  background: var(--bg);
 }
 
 .messages {
-  padding: 16px;
   flex: 1;
+  padding: 16px;
   overflow-y: auto;
+  scroll-behavior: smooth;
 }
 
+/* Hide scrollbar (optional aesthetic) */
 .messages::-webkit-scrollbar {
-  width: 8px;
+  width: 6px;
 }
+
 .messages::-webkit-scrollbar-thumb {
-  background: #d7dbec;
-  border-radius: 8px;
+  background: var(--muted);
+  border-radius: 6px;
 }
 
-.date-row {
-  display: flex;
-  justify-content: center;
-  margin: 12px 0;
-}
-
-.date-label {
-  display: inline-block;
-  background: #e0e0e0;
-  color: #333;
-  font-size: 0.85em;
-  font-weight: 600;
-  padding: 4px 12px;
-  border-radius: 20px;
-}
-
-body.dark .date-label {
-  background: #444;
-  color: #eee;
-}
-
-/* Messages */
+/* =========================
+   Message Bubble
+   ========================= */
 .message {
-  display: flex;
-  width: 100%;
   margin-bottom: 12px;
+  display: flex;
+}
+
+.message.me {
+  justify-content: flex-end;
 }
 
 .message.other {
   justify-content: flex-start;
 }
-.message.me {
-  justify-content: flex-end;
-}
 
 .message .text {
   max-width: 70%;
-  min-width: 120px;
-  padding: 10px 14px 20px;
-  border-radius: 12px;
-  position: relative;
-  word-break: break-word;
+  padding: 10px 12px;
+  border-radius: 14px;
   background: var(--bubble-other);
   color: var(--bubble-other-text);
-  opacity: 0;
-  transform: translateX(0);
-  animation: fadeIn 0.4s ease forwards;
-  display: inline-flex;
-  flex-direction: column;
+  position: relative;
+  word-wrap: break-word;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
 }
 
 .message.me .text {
   background: var(--bubble-me);
   color: var(--bubble-me-text);
-  border-radius: 16px 16px 0 16px;
-  animation: slideInRight 0.4s ease forwards;
-}
-
-.message.other .text {
-  border-radius: 16px 16px 16px 0;
-  animation: slideInLeft 0.4s ease forwards;
 }
 
 .timestamp {
-  position: absolute;
-  bottom: 4px;
-  right: 10px;
-  font-size: 0.7em;
-  opacity: 0.75;
-}
-
-/* Animations */
-@keyframes slideInRight {
-  from {
-    transform: translateX(40px);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
-@keyframes slideInLeft {
-  from {
-    transform: translateX(-40px);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75em;
+  color: var(--muted);
+  margin-left: 6px;
 }
 
 /* =========================
-   Composer / Typing / Badge
+   ✅ Read Status
+   ========================= */
+.read-status {
+  margin-left: 6px;
+  font-size: 0.9em;
+  color: gray !important;          /* single check: gray */
+  opacity: 0.7;
+  transition: color 0.3s ease, opacity 0.3s ease;
+}
+
+/* ✅ Ensure checkmarks always have true colors */
+.message.me .read-status {
+  color: gray !important; /* single check */
+}
+
+.message.me .read-status.read {
+  color: #2196f3 !important; /* double check */
+}
+
+.read-status.read {
+  color: #2196f3 !important;       /* double check: blue */
+  opacity: 1;
+  animation: fadeBlue 0.4s ease forwards;
+}
+
+@keyframes fadeBlue {
+  from { opacity: 0.6; color: gray; }
+  to { opacity: 1; color: #2196f3; }
+}
+
+/* =========================
+   Composer (Input)
    ========================= */
 .composer {
   display: flex;
-  padding: 12px;
+  padding: 10px;
   border-top: 1px solid var(--border);
-  gap: 8px;
   background: var(--card);
 }
 
 .composer textarea {
   flex: 1;
+  resize: none;
   padding: 10px;
   border-radius: 8px;
   border: 1px solid var(--border);
-  min-height: 48px;
-  resize: none;
-  background: var(--card);
+  outline: none;
+  font-family: inherit;
   color: var(--text);
+  background: var(--bg);
 }
 
 .composer button {
+  margin-left: 10px;
+  background: var(--accent);
+  color: white;
+  border: none;
   padding: 10px 16px;
   border-radius: 8px;
-  border: 0;
-  background: var(--accent);
-  color: #fff;
   cursor: pointer;
+  transition: opacity 0.2s;
 }
 
-.typing {
-  font-style: italic;
-  color: var(--muted);
-  padding: 4px 12px;
+.composer button:hover {
+  opacity: 0.85;
 }
 
 /* =========================
-   New Messages Button
+   Typing + Notification
    ========================= */
+.typing {
+  padding: 5px 15px;
+  font-size: 0.9em;
+  color: var(--muted);
+  font-style: italic;
+}
+
 .newMessages {
   position: absolute;
-  bottom: 70px; /* sits above composer */
+  bottom: 70px;
   right: 20px;
-  padding: 8px 14px;
   background: var(--accent);
-  color: #fff;
+  color: white;
+  padding: 8px 14px;
   border-radius: 20px;
-  text-align: center;
+  font-size: 0.9em;
   cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-  transition: opacity 0.5s ease;
-  z-index: 10;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
   opacity: 1;
+  transition: opacity 0.5s ease;
+  animation: fadeIn 0.3s ease forwards;
 }
 
 .newMessages.hide {
-  opacity: 0; /* smooth fade */
+  opacity: 0;
   pointer-events: none;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* =========================
    Responsive
    ========================= */
-@media (max-width: 840px) {
+@media (max-width: 768px) {
   .sidebar {
     display: none;
   }
-  .chat-container {
-    height: 94vh;
-  }
-}
-
-@media (max-width: 520px) {
-  .message .text {
+  .messages .text {
     max-width: 85%;
   }
 }
 
-/* Smooth transitions for theme switch */
-body,
-.chat-container,
-.chat-header,
-.sidebar,
-.messages,
-.message .text,
-.composer,
-.date-label {
-  transition: background-color 0.3s ease, color 0.3s ease;
+/* =========================
+   ✅ WhatsApp-Style Animated SVG Checkmarks
+   ========================= */
+.tick-icon {
+  width: 18px;
+  height: 18px;
+  vertical-align: middle;
+  margin-left: 6px;
+  opacity: 0.9;
+  filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.7));
+  transition: transform 0.3s ease, opacity 0.3s ease;
 }
 
-/* Animated theme toggle */
-.toggle-dark {
-  margin-right: 10px;
-  transition: background 0.3s ease, color 0.3s ease;
-  position: relative;
+/* Single (Delivered) */
+.tick-icon.single path {
+  stroke: #dcdcdc !important; /* light gray */
+  stroke-width: 2;
 }
 
-.toggle-dark::after {
-  content: attr(data-tooltip);
-  position: absolute;
-  bottom: -32px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--card);
-  color: var(--text);
-  padding: 4px 8px;
-  border-radius: 6px;
+/* Double (Read) */
+.tick-icon.double path {
+  stroke: #00e5ff !important; /* bright cyan */
+  stroke-width: 2;
+}
+
+/* Container to animate the pair */
+.timestamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 0.75em;
-  white-space: nowrap;
-  opacity: 0;
-  pointer-events: none;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
-  transition: opacity 0.3s ease;
+  color: var(--muted);
+  margin-left: 6px;
+  position: relative;
+  right: -2px;
+  transition: all 0.3s ease;
 }
 
-.toggle-dark:hover::after {
-  opacity: 1;
+/* ✨ Animation: when double-check appears */
+.message.me .tick-icon.double {
+  animation: slideInChecks 0.35s ease forwards;
+  transform-origin: center;
 }
 
-.mode-icon {
-  display: inline-block;
-  transition: opacity 0.3s ease, transform 0.3s ease;
+@keyframes slideInChecks {
+  0% {
+    transform: translateX(8px) scale(0.8);
+    opacity: 0.3;
+  }
+  60% {
+    transform: translateX(-2px) scale(1.05);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(0) scale(1);
+  }
 }
 
-.mode-icon.fade-in {
-  opacity: 1;
-  transform: translateY(0);
+/* Slight pop when changing from single to double */
+.message.me .tick-icon.double path {
+  animation: colorFade 0.4s ease forwards;
 }
 
-.mode-icon.fade-out {
-  opacity: 0.7;
-  transform: translateY(-2px);
+@keyframes colorFade {
+  0% {
+    stroke: #dcdcdc;
+  }
+  100% {
+    stroke: #00e5ff;
+  }
+}
+
+/* =========================
+   💬 Message Bounce Animation
+   ========================= */
+.message {
+  animation: fadeIn 0.2s ease forwards;
+}
+
+.message.me .text,
+.message.other .text {
+  animation: bounceIn 0.25s ease forwards;
+  transform-origin: bottom;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes bounceIn {
+  0% {
+    transform: translateY(15px) scale(0.98);
+    opacity: 0.4;
+  }
+  60% {
+    transform: translateY(-3px) scale(1.02);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
 }
 
 
