@@ -470,6 +470,73 @@ body {
   }
 }
 
+/* === Emoji picker UI === */
+.emoji-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-right: 8px;
+}
+
+.emoji-btn {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.emoji-btn:hover {
+  filter: brightness(0.98);
+}
+
+.emoji-popover {
+  position: absolute;
+  bottom: 48px;            /* sit above the composer */
+  left: 0;
+  z-index: 20;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 8px 22px rgba(0,0,0,0.15);
+  overflow: hidden;
+}
+
+/* Rooms UI */
+.room-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.room-badge {
+  background: var(--bubble-other);
+  color: var(--bubble-other-text);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+.room-badge:hover { filter: brightness(0.98); }
+
+/* Emoji picker (you already added in prior step, included here just in case) */
+.emoji-wrap { position: relative; display: flex; align-items: center; margin-right: 8px; }
+.emoji-btn { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; cursor: pointer; }
+.emoji-btn:hover { filter: brightness(0.98); }
+.emoji-popover {
+  position: absolute;
+  bottom: 48px;
+  left: 0;
+  z-index: 20;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 8px 22px rgba(0,0,0,0.15);
+  overflow: hidden;
+}
+
+
 
 
 
