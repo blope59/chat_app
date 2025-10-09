@@ -30,7 +30,7 @@ export default function App() {
   const [username, setUsername] = useState(null);
   const [token, setToken] = useState(null);
   const [mode, setMode] = useState("login");
-  const [form, setForm] = useState({ username: "", email: "", password: "" });
+  const [form, setForm] = useState({ username: "", email: "", password: "", avatar: null  });
 
   // rooms
   const [room, setRoom] = useState(null);
@@ -278,7 +278,32 @@ export default function App() {
       <div className="app">
         <div className="login">
           <h2>{mode === "login" ? "Login" : "Signup"}</h2>
-          <form onSubmit={handleAuth}>
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+
+              const formData = new FormData();
+              formData.append("username", form.username);
+              formData.append("email", form.email);
+              formData.append("password", form.password);
+              if (form.avatar) formData.append("avatar", form.avatar);
+
+              try {
+                const url = `${SERVER_URL}/${mode}`;
+                const res = await axios.post(url, formData, {
+                  headers: { "Content-Type": "multipart/form-data" },
+                });
+                setUsername(res.data.username);
+                setToken(res.data.token);
+                localStorage.setItem("chatUser", res.data.username);
+                localStorage.setItem("chatToken", res.data.token);
+                localStorage.setItem("chatAvatar", res.data.avatar || "");
+                socket.emit("joinRoom", { username: res.data.username });
+              } catch (err) {
+                alert(err.response?.data?.error || "Auth failed");
+              }
+            }}
+          >
             <input
               type="text"
               placeholder="Username"
@@ -286,12 +311,42 @@ export default function App() {
               onChange={(e) => setForm({ ...form, username: e.target.value })}
             />
             {mode === "signup" && (
-              <input
-                type="email"
-                placeholder="Email"
-                value={form.email || ""}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
-              />
+              <>
+                <input
+                  type="email"
+                  placeholder="Email"
+                  value={form.email || ""}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                />
+
+                {/* 🆕 Avatar upload field */}
+                <label style={{ display: "block", marginTop: "10px" }}>
+                  Choose avatar:
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) =>
+                      setForm({ ...form, avatar: e.target.files?.[0] || null })
+                    }
+                  />
+                </label>
+
+                {/* 🆕 Avatar preview */}
+                {form.avatar && (
+                  <img
+                    src={URL.createObjectURL(form.avatar)}
+                    alt="Preview"
+                    style={{
+                      width: "80px",
+                      height: "80px",
+                      borderRadius: "50%",
+                      marginTop: "10px",
+                      objectFit: "cover",
+                      border: "2px solid var(--border)",
+                    }}
+                  />
+                )}
+              </>
             )}
             <input
               type="password"

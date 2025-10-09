@@ -3,11 +3,12 @@ const express = require('express');
 const http = require('http');
 const cors = require('cors');
 const mongoose = require('mongoose');
+const multer = require('multer');          // 🆕 for file uploads
+const path = require('path');              // 🆕 for working with file paths
 const { Server } = require('socket.io');
 
 const User = require('./models/User');
 const Message = require('./models/Message');
-
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
@@ -18,45 +19,53 @@ const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey';
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: {
-    origin: CLIENT_URL,
-    methods: ['GET', 'POST'],
-  },
+  cors: { origin: CLIENT_URL, methods: ['GET', 'POST'] },
 });
 
-// --- MIDDLEWARE ---
+// --- Middleware ---
 app.use(cors({ origin: CLIENT_URL }));
 app.use(express.json());
 
-// --- DB CONNECT ---
+// 🆕 Serve static uploads folder so React can access images
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// 🆕 Multer storage setup for avatar uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, path.join(__dirname, 'uploads'));
+  },
+  filename: (req, file, cb) => {
+    const unique = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    cb(null, unique + path.extname(file.originalname));
+  },
+});
+const upload = multer({ storage });
+
+// --- Connect to MongoDB ---
 mongoose
   .connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => console.log('✅ MongoDB connected'))
   .catch((err) => console.error('❌ MongoDB error:', err));
 
-// ---- In-memory rooms registry (optional convenience) ----
-const knownRooms = new Set(['general']);
-
-// --- AUTH ROUTES ---
-app.post('/signup', async (req, res) => {
+// --- Auth Routes ---
+app.post('/signup', upload.single('avatar'), async (req, res) => {
   try {
     const { username, email, password } = req.body;
-    if (!username || !email || !password) {
+    if (!username || !email || !password)
       return res.status(400).json({ error: 'All fields are required' });
-    }
 
-    const existingUser = await User.findOne({ username });
-    if (existingUser) return res.status(400).json({ error: 'Username already exists' });
+    const existingUser = await User.findOne({ $or: [{ username }, { email }] });
+    if (existingUser)
+      return res.status(400).json({ error: 'Username or email already exists' });
 
-    const existingEmail = await User.findOne({ email });
-    if (existingEmail) return res.status(400).json({ error: 'Email already in use' });
+    const hashed = await bcrypt.hash(password, 10);
+    const avatarPath = req.file ? `/uploads/${req.file.filename}` : '';
 
-    const hashedPw = await bcrypt.hash(password, 10);
-    const user = new User({ username, email, password: hashedPw });
+    const user = new User({ username, email, password: hashed, avatar: avatarPath });
     await user.save();
 
     const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '1h' });
-    res.json({ token, username: user.username });
+    res.json({ token, username: user.username, avatar: user.avatar });
   } catch (err) {
     console.error('Signup error:', err);
     res.status(500).json({ error: 'Signup failed' });
@@ -74,24 +83,43 @@ app.post('/login', async (req, res) => {
     if (!isMatch) return res.status(400).json({ error: 'Invalid credentials' });
 
     const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '1h' });
-    res.json({ token, username: user.username });
+    res.json({ token, username: user.username, avatar: user.avatar });
   } catch (err) {
     console.error('Login error:', err);
     res.status(500).json({ error: 'Login failed' });
   }
 });
 
-// --- ROOMS + MESSAGES ROUTES ---
+// 🆕 Route to update avatar later (optional)
+app.post('/upload-avatar', upload.single('avatar'), async (req, res) => {
+  try {
+    const { username } = req.body;
+    const user = await User.findOne({ username });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    if (req.file) {
+      user.avatar = `/uploads/${req.file.filename}`;
+      await user.save();
+      res.json({ success: true, avatar: user.avatar });
+    } else {
+      res.status(400).json({ error: 'No file uploaded' });
+    }
+  } catch (err) {
+    console.error('Avatar upload error:', err);
+    res.status(500).json({ error: 'Upload failed' });
+  }
+});
+
+// --- Messages + Rooms Routes (same as before) ---
+const knownRooms = new Set(['general']);
+
 app.get('/rooms', async (req, res) => {
   try {
-    // Also derive rooms from messages so you don't lose them on restart
     const agg = await Message.aggregate([{ $group: { _id: '$room' } }]);
     const fromDb = agg.map((r) => r._id).filter(Boolean);
     fromDb.forEach((r) => knownRooms.add(r));
-    if (!knownRooms.size) knownRooms.add('general');
     res.json(Array.from(knownRooms.values()).sort());
   } catch (err) {
-    console.error('Failed to list rooms:', err);
     res.status(500).json({ error: 'Failed to list rooms' });
   }
 });
@@ -100,20 +128,14 @@ app.get('/messages', async (req, res) => {
   try {
     const room = (req.query.room || 'general').trim();
     if (room) knownRooms.add(room);
-    const limit = Math.min(parseInt(req.query.limit || '500', 10), 1000);
-    const messages = await Message.find({ room }).sort({ createdAt: 1 }).limit(limit);
+    const messages = await Message.find({ room }).sort({ createdAt: 1 });
     res.json(messages);
   } catch (err) {
-    console.error('Failed to fetch messages:', err);
     res.status(500).json({ error: 'Failed to fetch messages' });
   }
 });
 
 // --- SOCKET.IO ---
-/**
- * We track online users per socket, including their room.
- * onlineUsers: Map<socketId, { username, room }>
- */
 const onlineUsers = new Map();
 
 function emitOnlineUsers(room) {
@@ -124,7 +146,6 @@ function emitOnlineUsers(room) {
 }
 
 io.on('connection', (socket) => {
-  // JOIN ROOM
   socket.on('joinRoom', ({ username, room }) => {
     const chosenRoom = (room || 'general').trim();
     socket.username = username;
@@ -132,63 +153,46 @@ io.on('connection', (socket) => {
     socket.join(chosenRoom);
     onlineUsers.set(socket.id, { username, room: chosenRoom });
     knownRooms.add(chosenRoom);
-
     emitOnlineUsers(chosenRoom);
     console.log(`👤 ${username} joined room: ${chosenRoom}`);
   });
 
-  // TYPING
   socket.on('typing', ({ username, room }) => {
-    const r = (room || socket.room || 'general').trim();
-    socket.to(r).emit('typing', username);
+    socket.to(room).emit('typing', username);
   });
 
   socket.on('stopTyping', ({ room }) => {
-    const r = (room || socket.room || 'general').trim();
-    socket.to(r).emit('stopTyping');
+    socket.to(room).emit('stopTyping');
   });
 
-  // SEND MESSAGE
   socket.on('sendMessage', async ({ username, text, room }) => {
     try {
-      const r = (room || socket.room || 'general').trim();
-      const message = new Message({
-        room: r,
-        username,
-        text,
-        readBy: [], // sender does NOT auto-read
-      });
-      await message.save();
-      io.to(r).emit('receiveMessage', message);
-      console.log(`💬 [${r}] ${username}: ${text}`);
+      const msg = new Message({ room, username, text, readBy: [] });
+      await msg.save();
+      io.to(room).emit('receiveMessage', msg);
+      console.log(`💬 [${room}] ${username}: ${text}`);
     } catch (err) {
       console.error('Error saving message:', err);
     }
   });
 
-  // MARK AS READ
   socket.on('markAsRead', async ({ username, room }) => {
     try {
-      const r = (room || socket.room || 'general').trim();
-      const unread = await Message.find({ room: r, readBy: { $ne: username } });
+      const unread = await Message.find({ room, readBy: { $ne: username } });
       if (unread.length) {
-        await Promise.all(
-          unread.map(async (msg) => {
-            msg.readBy.push(username);
-            await msg.save();
-          })
-        );
-        // Send updated room messages so clients can patch readBy
-        const updated = await Message.find({ room: r }).sort({ createdAt: 1 });
-        io.to(r).emit('messageRead', updated);
-        console.log(`📬 ${username} marked ${unread.length} as read in ${r}`);
+        for (const m of unread) {
+          m.readBy.push(username);
+          await m.save();
+        }
+        const updated = await Message.find({ room }).sort({ createdAt: 1 });
+        io.to(room).emit('messageRead', updated);
+        console.log(`📬 ${username} marked ${unread.length} messages as read in ${room}`);
       }
     } catch (err) {
       console.error('❌ Error updating read receipts:', err);
     }
   });
 
-  // DISCONNECT
   socket.on('disconnect', () => {
     const info = onlineUsers.get(socket.id);
     onlineUsers.delete(socket.id);
@@ -201,5 +205,4 @@ io.on('connection', (socket) => {
 server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
-
 
