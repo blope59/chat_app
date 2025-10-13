@@ -5,7 +5,6 @@ import EmojiPicker from "emoji-picker-react";
 import "./App.css";
 
 const SERVER_URL = process.env.REACT_APP_SERVER_URL || "http://localhost:3001";
-// single socket
 const socket = io(SERVER_URL, { transports: ["websocket"] });
 
 function formatTimestamp(dateString) {
@@ -26,35 +25,37 @@ const DoubleCheck = () => (
 );
 
 export default function App() {
-  // auth
-  const [username, setUsername] = useState(null);
-  const [token, setToken] = useState(null);
+  // --- Auth state ---
+  const [username, setUsername] = useState(localStorage.getItem("chatUser") || null);
+  const [token, setToken] = useState(localStorage.getItem("chatToken") || null);
+  const [avatar, setAvatar] = useState(localStorage.getItem("chatAvatar") || "");
   const [mode, setMode] = useState("login");
-  const [form, setForm] = useState({ username: "", email: "", password: "", avatar: null  });
+  const [form, setForm] = useState({ username: "", email: "", password: "", avatar: null });
 
-  // rooms
-  const [room, setRoom] = useState(null);
+  // --- Room state ---
+  const [room, setRoom] = useState(localStorage.getItem("chatRoom") || null);
   const [rooms, setRooms] = useState([]);
   const [newRoom, setNewRoom] = useState("");
 
-  // chat state
+  // --- Chat state ---
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
   const [onlineUsers, setOnlineUsers] = useState([]);
   const [typingUser, setTypingUser] = useState(null);
 
-  // UI
-  const [darkMode, setDarkMode] = useState(false);
+  // --- UI state ---
+  const [darkMode, setDarkMode] = useState(localStorage.getItem("darkMode") === "true");
   const [showNewMessages, setShowNewMessages] = useState(false);
   const [fadeOut, setFadeOut] = useState(false);
   const [newMsgCount, setNewMsgCount] = useState(0);
   const [showEmoji, setShowEmoji] = useState(false);
 
-  // refs
+  // --- Refs ---
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const hideTimerRef = useRef(null);
 
+  // --- Helper functions ---
   const messagesDiv = () => messagesEndRef.current?.parentNode;
   const scrollToBottom = (behavior = "smooth") => {
     const el = messagesDiv();
@@ -67,52 +68,59 @@ export default function App() {
     return scrollHeight - scrollTop <= clientHeight + 50;
   };
 
-  // boot stored session + theme + last room
+  // --- On mount ---
   useEffect(() => {
-    const u = localStorage.getItem("chatUser");
-    const t = localStorage.getItem("chatToken");
-    const theme = localStorage.getItem("darkMode");
-    const savedRoom = localStorage.getItem("chatRoom");
-
-    if (u && t) {
-      setUsername(u);
-      setToken(t);
-    }
-    if (theme === "true") {
-      setDarkMode(true);
-      document.body.classList.add("dark");
-    }
-    if (savedRoom) setRoom(savedRoom);
-
-    // prefetch rooms list
     axios.get(`${SERVER_URL}/rooms`).then((res) => setRooms(res.data || [])).catch(() => {});
+    if (darkMode) document.body.classList.add("dark");
   }, []);
 
-  // auth handlers
+  // --- Auth handlers ---
   const handleAuth = async (e) => {
     e.preventDefault();
     try {
       const url = `${SERVER_URL}/${mode}`;
-      const res = await axios.post(url, form);
+      let res;
+
+      if (mode === "login") {
+        res = await axios.post(url, {
+          username: form.username,
+          password: form.password,
+        });
+      } else {
+        const formData = new FormData();
+        formData.append("username", form.username);
+        formData.append("email", form.email);
+        formData.append("password", form.password);
+        if (form.avatar) formData.append("avatar", form.avatar);
+        res = await axios.post(url, formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+      }
+
       setUsername(res.data.username);
       setToken(res.data.token);
+      setAvatar(res.data.avatar || "");
       localStorage.setItem("chatUser", res.data.username);
       localStorage.setItem("chatToken", res.data.token);
+      localStorage.setItem("chatAvatar", res.data.avatar || "");
+      socket.emit("joinRoom", { username: res.data.username });
     } catch (err) {
       alert(err.response?.data?.error || "Auth failed");
     }
   };
+
   const handleLogout = () => {
     setUsername(null);
     setToken(null);
     localStorage.removeItem("chatUser");
     localStorage.removeItem("chatToken");
-    // also leave room
+    localStorage.removeItem("chatAvatar");
     setRoom(null);
     localStorage.removeItem("chatRoom");
     setMessages([]);
     setOnlineUsers([]);
   };
+
   const toggleDarkMode = () => {
     const v = !darkMode;
     setDarkMode(v);
@@ -120,21 +128,16 @@ export default function App() {
     localStorage.setItem("darkMode", v);
   };
 
-  // joining a room (select existing or create new)
+  // --- Join room ---
   const joinRoom = async (targetRoom) => {
     const r = (targetRoom || newRoom || "").trim() || "general";
     setRoom(r);
     localStorage.setItem("chatRoom", r);
 
-    // fetch that room's messages
     try {
       const res = await axios.get(`${SERVER_URL}/messages?room=${encodeURIComponent(r)}`);
       setMessages(res.data || []);
-      // join socket room (needs username set)
-      if (username) {
-        socket.emit("joinRoom", { username, room: r });
-      }
-      // initial read sync
+      if (username) socket.emit("joinRoom", { username, room: r });
       setTimeout(() => {
         scrollToBottom("auto");
         if (username) socket.emit("markAsRead", { username, room: r });
@@ -143,33 +146,21 @@ export default function App() {
       console.error("Failed to load room messages:", err);
     }
 
-    // refresh rooms list (new custom gets added automatically)
     axios.get(`${SERVER_URL}/rooms`).then((res) => setRooms(res.data || [])).catch(() => {});
   };
 
-  // load messages when username+room are both ready (e.g., after login)
-  useEffect(() => {
-    if (username && room) {
-      socket.emit("joinRoom", { username, room });
-      axios
-        .get(`${SERVER_URL}/messages?room=${encodeURIComponent(room)}`)
-        .then((res) => {
-          setMessages(res.data || []);
-          setTimeout(() => {
-            scrollToBottom("auto");
-            socket.emit("markAsRead", { username, room });
-          }, 30);
-        })
-        .catch((e) => console.error("Failed to fetch messages:", e));
-    }
-  }, [username]); // eslint-disable-line
-
-  // socket listeners (room-scoped)
+  // --- Socket listeners ---
   useEffect(() => {
     const receiveHandler = (message) => {
-      // only accept messages for my current room
       if (message.room !== room) return;
-      setMessages((prev) => [...prev, message]);
+
+      // Remove temporary "pending" message if it matches the text
+      setMessages((prev) => {
+        const withoutTemp = prev.filter(
+          (m) => !(m.pending && m.text === message.text && m.username === message.username)
+        );
+        return [...withoutTemp, message];
+      });
 
       if (message.username === username) {
         setTimeout(() => scrollToBottom(), 40);
@@ -184,43 +175,76 @@ export default function App() {
       }
     };
 
-    const readHandler = (updatedMessages) => {
-      // server emits full room messages; ensure they match current room
-      if (!updatedMessages?.length || updatedMessages[0]?.room !== room) return;
-      const map = new Map(updatedMessages.map((m) => [m._id, m]));
-      setMessages((prev) => prev.map((m) => (map.has(m._id) ? { ...m, readBy: [...map.get(m._id).readBy] } : m)));
-    };
-
-    const onlineHandler = (users) => setOnlineUsers(users || []);
-    const typingHandler = (who) => setTypingUser(who);
-    const stopTypingHandler = () => setTypingUser(null);
-
     socket.on("receiveMessage", receiveHandler);
-    socket.on("messageRead", readHandler);
-    socket.on("onlineUsers", onlineHandler);
-    socket.on("typing", typingHandler);
-    socket.on("stopTyping", stopTypingHandler);
+    socket.on("messageRead", (updated) => {
+      if (!updated?.length || updated[0]?.room !== room) return;
+      const map = new Map(updated.map((m) => [m._id, m]));
+      setMessages((prev) =>
+        prev.map((m) => (map.has(m._id) ? { ...m, readBy: map.get(m._id).readBy } : m))
+      );
+    });
+    socket.on("onlineUsers", (users) => setOnlineUsers(users || []));
+    socket.on("typing", (who) => {
+      setTypingUser(who);
+      // Reset any fade-out timer if a new typing event comes in
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    });
+
+    socket.on("stopTyping", () => {
+      // Wait 1.5s before removing the "typing" text, for smoother fade-out
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => setTypingUser(null), 1500);
+    });
 
     return () => {
       socket.off("receiveMessage", receiveHandler);
-      socket.off("messageRead", readHandler);
-      socket.off("onlineUsers", onlineHandler);
-      socket.off("typing", typingHandler);
-      socket.off("stopTyping", stopTypingHandler);
+      socket.off("messageRead");
+      socket.off("onlineUsers");
+      socket.off("typing");
+      socket.off("stopTyping");
     };
   }, [room, username]);
 
-  // stay stuck to bottom when appropriate
-  useEffect(() => {
-    const last = messages[messages.length - 1];
-    if (last?.username === username) {
-      scrollToBottom();
-    } else if (nearBottom()) {
-      scrollToBottom();
-    }
-  }, [messages]); // eslint-disable-line
+  // --- Typing ---
+  const handleTyping = (e) => {
+    const v = e.target.value;
+    setText(v);
+    if (!username || !room) return;
+    socket.emit("typing", { username, room });
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(() => socket.emit("stopTyping", { room }), 900);
+  };
 
-  // auto-hide for new message pill
+  // --- Send message (optimistic render) ---
+  const sendMessage = (e) => {
+    e.preventDefault();
+    const t = text.trim();
+    if (!t || !username || !room) return;
+
+    const tempMsg = {
+      _id: "temp-" + Date.now(),
+      username,
+      text: t,
+      room,
+      createdAt: new Date().toISOString(),
+      readBy: [],
+      pending: true,
+    };
+
+    setMessages((prev) => [...prev, tempMsg]);
+    scrollToBottom("auto");
+    setText("");
+    setShowEmoji(false);
+    socket.emit("stopTyping", { room });
+    socket.emit("sendMessage", { username, text: t, room });
+  };
+
+  // --- Emoji ---
+  const onEmojiClick = (emojiData) => {
+    setText((prev) => prev + (emojiData?.emoji || ""));
+  };
+
+  // --- Auto hide new message pill ---
   useEffect(() => {
     if (!showNewMessages) return;
     if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
@@ -234,6 +258,7 @@ export default function App() {
     return () => hideTimerRef.current && clearTimeout(hideTimerRef.current);
   }, [showNewMessages]);
 
+  // --- Scroll (mark as read) ---
   const handleScroll = (e) => {
     const el = e.target;
     const isNear = el.scrollHeight - el.scrollTop <= el.clientHeight + 50;
@@ -245,65 +270,13 @@ export default function App() {
     }
   };
 
-  // typing
-  const handleTyping = (e) => {
-    const v = e.target.value;
-    setText(v);
-    if (!username || !room) return;
-    socket.emit("typing", { username, room });
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-    typingTimeoutRef.current = setTimeout(() => socket.emit("stopTyping", { room }), 900);
-  };
-
-  // send
-  const sendMessage = (e) => {
-    e.preventDefault();
-    const t = text.trim();
-    if (!t || !username || !room) return;
-    socket.emit("sendMessage", { username, text: t, room });
-    setText("");
-    setShowEmoji(false);
-    socket.emit("stopTyping", { room });
-    setTimeout(() => scrollToBottom(), 35);
-  };
-
-  // emoji
-  const onEmojiClick = (emojiData) => {
-    setText((prev) => prev + (emojiData?.emoji || ""));
-  };
-
-  // --- Screens ---
+  // --- UI rendering ---
   if (!username) {
     return (
       <div className="app">
         <div className="login">
           <h2>{mode === "login" ? "Login" : "Signup"}</h2>
-          <form
-            onSubmit={async (e) => {
-              e.preventDefault();
-
-              const formData = new FormData();
-              formData.append("username", form.username);
-              formData.append("email", form.email);
-              formData.append("password", form.password);
-              if (form.avatar) formData.append("avatar", form.avatar);
-
-              try {
-                const url = `${SERVER_URL}/${mode}`;
-                const res = await axios.post(url, formData, {
-                  headers: { "Content-Type": "multipart/form-data" },
-                });
-                setUsername(res.data.username);
-                setToken(res.data.token);
-                localStorage.setItem("chatUser", res.data.username);
-                localStorage.setItem("chatToken", res.data.token);
-                localStorage.setItem("chatAvatar", res.data.avatar || "");
-                socket.emit("joinRoom", { username: res.data.username });
-              } catch (err) {
-                alert(err.response?.data?.error || "Auth failed");
-              }
-            }}
-          >
+          <form onSubmit={handleAuth}>
             <input
               type="text"
               placeholder="Username"
@@ -315,23 +288,17 @@ export default function App() {
                 <input
                   type="email"
                   placeholder="Email"
-                  value={form.email || ""}
+                  value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
                 />
-
-                {/* 🆕 Avatar upload field */}
-                <label style={{ display: "block", marginTop: "10px" }}>
+                <label style={{ display: "block", marginTop: 10 }}>
                   Choose avatar:
                   <input
                     type="file"
                     accept="image/*"
-                    onChange={(e) =>
-                      setForm({ ...form, avatar: e.target.files?.[0] || null })
-                    }
+                    onChange={(e) => setForm({ ...form, avatar: e.target.files?.[0] || null })}
                   />
                 </label>
-
-                {/* 🆕 Avatar preview */}
                 {form.avatar && (
                   <img
                     src={URL.createObjectURL(form.avatar)}
@@ -417,7 +384,7 @@ export default function App() {
     );
   }
 
-  // Chat screen
+  // --- Chat screen ---
   return (
     <div className="chat-container">
       <div className="chat-header">
@@ -426,17 +393,38 @@ export default function App() {
           <button className="toggle-dark" onClick={toggleDarkMode}>
             {darkMode ? "☀️ Light" : "🌙 Dark"}
           </button>
-          <button className="logout" onClick={handleLogout}>Logout</button>
+          <button className="logout" onClick={handleLogout}>
+            Logout
+          </button>
         </div>
       </div>
 
       <div className="chat-main">
         <aside className="sidebar">
           <h4>Online in #{room}</h4>
-          <ul>{onlineUsers.map((u, i) => <li key={i}>{u}</li>)}</ul>
-          {typingUser && <p className="typing">{typingUser} is typing…</p>}
+          <ul className="online-list">
+            {onlineUsers.map((u, i) => (
+              <li key={i} className="online-item">
+                <img
+                  src={`${SERVER_URL}${u.avatar || "/uploads/default.png"}`}
+                  alt={`${u.username} avatar`}
+                  className="online-avatar"
+                  onError={(e) => (e.target.src = `${SERVER_URL}/uploads/default.png`)}
+                />
+                <span>{u.username}</span>
+              </li>
+            ))}
+          </ul>
+
           <div style={{ marginTop: 12 }}>
-            <button className="link" onClick={() => { setRoom(null); localStorage.removeItem("chatRoom"); setMessages([]); }}>
+            <button
+              className="link"
+              onClick={() => {
+                setRoom(null);
+                localStorage.removeItem("chatRoom");
+                setMessages([]);
+              }}
+            >
               ← Switch room
             </button>
           </div>
@@ -447,8 +435,23 @@ export default function App() {
             {messages.map((m, i) => {
               const mine = m.username === username;
               const readers = (m.readBy || []).filter((u) => u !== m.username);
+              const userAvatar = mine
+                ? avatar
+                : m.avatar || `${SERVER_URL}/uploads/default.png`;
+
               return (
-                <div key={m._id || i} className={`message ${mine ? "me" : "other"}`}>
+                <div
+                  key={m._id || i}
+                  className={`message ${mine ? "me" : "other"} ${m.pending ? "pending" : ""}`}
+                >
+                  {!mine && (
+                    <img
+                      src={userAvatar.startsWith("http") ? userAvatar : `${SERVER_URL}${userAvatar}`}
+                      alt={`${m.username} avatar`}
+                      className="msg-avatar"
+                      onError={(e) => (e.target.src = `${SERVER_URL}/uploads/default.png`)}
+                    />
+                  )}
                   <div className="text">
                     {!mine && <strong>{m.username}: </strong>}
                     {m.text}
@@ -463,6 +466,14 @@ export default function App() {
             <div ref={messagesEndRef} />
           </div>
 
+          {/* ✅ Typing indicator placed below messages but above composer */}
+          {typingUser && (
+            <div className="typing-container">
+              <p className="typing">{typingUser} is typing…</p>
+            </div>
+          )}
+
+          {/* ✅ “New messages” pill stays separate */}
           {showNewMessages && (
             <div
               className={`newMessages ${fadeOut ? "hide" : ""}`}
@@ -477,6 +488,7 @@ export default function App() {
             </div>
           )}
 
+          {/* ✅ Composer stays at bottom */}
           <form className="composer" onSubmit={sendMessage}>
             <div className="emoji-wrap">
               <button
@@ -495,7 +507,11 @@ export default function App() {
               )}
             </div>
 
-            <textarea value={text} onChange={handleTyping} placeholder={`Message #${room}…`} />
+            <textarea
+              value={text}
+              onChange={handleTyping}
+              placeholder={`Message #${room}…`}
+            />
             <button type="submit">Send</button>
           </form>
         </section>
@@ -503,6 +519,10 @@ export default function App() {
     </div>
   );
 }
+
+
+
+
 
 
 

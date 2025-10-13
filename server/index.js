@@ -3,14 +3,14 @@ const express = require('express');
 const http = require('http');
 const cors = require('cors');
 const mongoose = require('mongoose');
-const multer = require('multer');          // 🆕 for file uploads
-const path = require('path');              // 🆕 for working with file paths
+const multer = require('multer');
+const path = require('path');
 const { Server } = require('socket.io');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
 const User = require('./models/User');
 const Message = require('./models/Message');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
 
 const PORT = process.env.PORT || 3001;
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000';
@@ -22,18 +22,15 @@ const io = new Server(server, {
   cors: { origin: CLIENT_URL, methods: ['GET', 'POST'] },
 });
 
-// --- Middleware ---
+// Middleware
 app.use(cors({ origin: CLIENT_URL }));
 app.use(express.json());
-
-// 🆕 Serve static uploads folder so React can access images
+app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// 🆕 Multer storage setup for avatar uploads
+// Multer config
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, 'uploads'));
-  },
+  destination: (req, file, cb) => cb(null, path.join(__dirname, 'uploads')),
   filename: (req, file, cb) => {
     const unique = Date.now() + '-' + Math.round(Math.random() * 1e9);
     cb(null, unique + path.extname(file.originalname));
@@ -41,31 +38,43 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// --- Connect to MongoDB ---
+// MongoDB connection
 mongoose
-  .connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+  .connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/chat_app', {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  })
   .then(() => console.log('✅ MongoDB connected'))
-  .catch((err) => console.error('❌ MongoDB error:', err));
+  .catch((err) => console.error('❌ MongoDB connection error:', err));
 
-// --- Auth Routes ---
+// ===================================================
+// AUTH ROUTES
+// ===================================================
 app.post('/signup', upload.single('avatar'), async (req, res) => {
   try {
     const { username, email, password } = req.body;
     if (!username || !email || !password)
       return res.status(400).json({ error: 'All fields are required' });
 
-    const existingUser = await User.findOne({ $or: [{ username }, { email }] });
-    if (existingUser)
+    const existing = await User.findOne({ $or: [{ username }, { email }] });
+    if (existing)
       return res.status(400).json({ error: 'Username or email already exists' });
 
     const hashed = await bcrypt.hash(password, 10);
-    const avatarPath = req.file ? `/uploads/${req.file.filename}` : '';
+    const avatarPath = req.file
+      ? `/uploads/${req.file.filename}`
+      : '/uploads/default.png';
 
     const user = new User({ username, email, password: hashed, avatar: avatarPath });
     await user.save();
 
-    const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '1h' });
-    res.json({ token, username: user.username, avatar: user.avatar });
+    const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '7d' });
+
+    res.json({
+      token,
+      username: user.username,
+      avatar: user.avatar,
+    });
   } catch (err) {
     console.error('Signup error:', err);
     res.status(500).json({ error: 'Signup failed' });
@@ -74,43 +83,32 @@ app.post('/signup', upload.single('avatar'), async (req, res) => {
 
 app.post('/login', async (req, res) => {
   try {
-    const { username, password } = req.body;
-    const query = username.includes('@') ? { email: username } : { username };
-    const user = await User.findOne(query);
+    const { username, email, password } = req.body;
+    if (!password || (!username && !email))
+      return res.status(400).json({ error: 'Missing credentials' });
 
-    if (!user) return res.status(400).json({ error: 'Invalid credentials' });
+    const user = await User.findOne(email ? { email } : { username });
+    if (!user) return res.status(400).json({ error: 'User not found' });
+
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(400).json({ error: 'Invalid credentials' });
+    if (!isMatch) return res.status(400).json({ error: 'Incorrect password' });
 
-    const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '1h' });
-    res.json({ token, username: user.username, avatar: user.avatar });
+    const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '7d' });
+
+    res.json({
+      username: user.username,
+      avatar: user.avatar || '/uploads/default.png',
+      token,
+    });
   } catch (err) {
     console.error('Login error:', err);
     res.status(500).json({ error: 'Login failed' });
   }
 });
 
-// 🆕 Route to update avatar later (optional)
-app.post('/upload-avatar', upload.single('avatar'), async (req, res) => {
-  try {
-    const { username } = req.body;
-    const user = await User.findOne({ username });
-    if (!user) return res.status(404).json({ error: 'User not found' });
-
-    if (req.file) {
-      user.avatar = `/uploads/${req.file.filename}`;
-      await user.save();
-      res.json({ success: true, avatar: user.avatar });
-    } else {
-      res.status(400).json({ error: 'No file uploaded' });
-    }
-  } catch (err) {
-    console.error('Avatar upload error:', err);
-    res.status(500).json({ error: 'Upload failed' });
-  }
-});
-
-// --- Messages + Rooms Routes (same as before) ---
+// ===================================================
+// ROOMS & MESSAGES
+// ===================================================
 const knownRooms = new Set(['general']);
 
 app.get('/rooms', async (req, res) => {
@@ -119,7 +117,7 @@ app.get('/rooms', async (req, res) => {
     const fromDb = agg.map((r) => r._id).filter(Boolean);
     fromDb.forEach((r) => knownRooms.add(r));
     res.json(Array.from(knownRooms.values()).sort());
-  } catch (err) {
+  } catch {
     res.status(500).json({ error: 'Failed to list rooms' });
   }
 });
@@ -130,30 +128,42 @@ app.get('/messages', async (req, res) => {
     if (room) knownRooms.add(room);
     const messages = await Message.find({ room }).sort({ createdAt: 1 });
     res.json(messages);
-  } catch (err) {
+  } catch {
     res.status(500).json({ error: 'Failed to fetch messages' });
   }
 });
 
-// --- SOCKET.IO ---
+// ===================================================
+// SOCKET.IO
+// ===================================================
 const onlineUsers = new Map();
 
 function emitOnlineUsers(room) {
   const users = Array.from(onlineUsers.values())
     .filter((u) => u.room === room)
-    .map((u) => u.username);
+    .map((u) => ({
+      username: u.username,
+      avatar: u.avatar || '/uploads/default.png',
+    }));
   io.to(room).emit('onlineUsers', users);
 }
 
 io.on('connection', (socket) => {
-  socket.on('joinRoom', ({ username, room }) => {
+  console.log('🟢 New client connected:', socket.id);
+
+  socket.on('joinRoom', async ({ username, room }) => {
     const chosenRoom = (room || 'general').trim();
     socket.username = username;
     socket.room = chosenRoom;
+
+    const user = await User.findOne({ username });
+    const avatar = user?.avatar || '/uploads/default.png';
+
     socket.join(chosenRoom);
-    onlineUsers.set(socket.id, { username, room: chosenRoom });
+    onlineUsers.set(socket.id, { username, room: chosenRoom, avatar });
     knownRooms.add(chosenRoom);
     emitOnlineUsers(chosenRoom);
+
     console.log(`👤 ${username} joined room: ${chosenRoom}`);
   });
 
@@ -167,8 +177,20 @@ io.on('connection', (socket) => {
 
   socket.on('sendMessage', async ({ username, text, room }) => {
     try {
-      const msg = new Message({ room, username, text, readBy: [] });
+      const user = await User.findOne({ username });
+      const msg = new Message({
+        room,
+        username,
+        text,
+        avatar: user?.avatar || '/uploads/default.png',
+        readBy: [],
+      });
       await msg.save();
+
+      // Make sure the room is attached to the message
+      msg.room = room;
+
+      // Emit to everyone in room (including sender)
       io.to(room).emit('receiveMessage', msg);
       console.log(`💬 [${room}] ${username}: ${text}`);
     } catch (err) {
@@ -179,17 +201,14 @@ io.on('connection', (socket) => {
   socket.on('markAsRead', async ({ username, room }) => {
     try {
       const unread = await Message.find({ room, readBy: { $ne: username } });
-      if (unread.length) {
-        for (const m of unread) {
-          m.readBy.push(username);
-          await m.save();
-        }
-        const updated = await Message.find({ room }).sort({ createdAt: 1 });
-        io.to(room).emit('messageRead', updated);
-        console.log(`📬 ${username} marked ${unread.length} messages as read in ${room}`);
+      for (const m of unread) {
+        m.readBy.push(username);
+        await m.save();
       }
+      const updated = await Message.find({ room }).sort({ createdAt: 1 });
+      io.to(room).emit('messageRead', updated);
     } catch (err) {
-      console.error('❌ Error updating read receipts:', err);
+      console.error('Error updating read receipts:', err);
     }
   });
 
@@ -197,12 +216,18 @@ io.on('connection', (socket) => {
     const info = onlineUsers.get(socket.id);
     onlineUsers.delete(socket.id);
     if (info?.room) emitOnlineUsers(info.room);
-    console.log('🔴 Client disconnected:', socket.id);
+    console.log('🔴 Disconnected:', socket.id);
   });
 });
 
-// --- START SERVER ---
+// ===================================================
+// START SERVER
+// ===================================================
 server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
+
+
+
+
 

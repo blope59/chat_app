@@ -183,6 +183,7 @@ body {
   display: flex;
   flex-direction: column;
   background: var(--bg);
+  position: relative;
 }
 
 .messages {
@@ -314,11 +315,29 @@ body {
 /* =========================
    Typing + Notification
    ========================= */
+.typing-container {
+  position: absolute;
+  bottom: 60px; /* sits just above the composer bar */
+  left: 0;
+  width: 100%;
+  text-align: left;
+  padding: 0 16px;
+  pointer-events: none; /* so it never blocks clicks */
+  z-index: 5;
+  opacity: 1;
+  transition: opacity 0.8s ease-in-out;
+}
+
 .typing {
-  padding: 5px 15px;
-  font-size: 0.9em;
-  color: var(--muted);
+  display: inline-block;
   font-style: italic;
+  color: var(--muted);
+  background: var(--card);
+  padding: 2px 10px;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  animation: fadeInOut 0.5s ease-in-out infinite alternate;
+  transition: opacity 0.8s ease-in-out;
 }
 
 .newMessages {
@@ -345,6 +364,11 @@ body {
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(5px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInOut {
+  from { opacity: 0.4; }
+  to { opacity: 1; }
 }
 
 /* =========================
@@ -534,6 +558,43 @@ body {
   border-radius: 12px;
   box-shadow: 0 8px 22px rgba(0,0,0,0.15);
   overflow: hidden;
+}
+
+/* ==== Avatar Styling ==== */
+.msg-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-right: 8px;
+  border: 1px solid var(--border);
+}
+
+.online-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.online-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 6px;
+  gap: 6px;
+}
+
+.online-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--border);
+}
+
+/* Dim pending messages before they're confirmed by server */
+.message.pending .text {
+  opacity: 0.6;
+  filter: brightness(0.95);
 }
 
 
