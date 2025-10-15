@@ -70,9 +70,28 @@ export default function App() {
 
   // --- On mount ---
   useEffect(() => {
-    axios.get(`${SERVER_URL}/rooms`).then((res) => setRooms(res.data || [])).catch(() => {});
-    if (darkMode) document.body.classList.add("dark");
+  axios.get(`${SERVER_URL}/rooms`)
+    .then((res) => setRooms(res.data || []))
+    .catch(() => {});
+
+  if (darkMode) document.body.classList.add("dark");
+
+  // ✅ If user and room are saved, rejoin automatically
+  const savedUser = localStorage.getItem("chatUser");
+  const savedRoom = localStorage.getItem("chatRoom");
+  if (savedUser && savedRoom) {
+    socket.emit("joinRoom", { username: savedUser, room: savedRoom });
+    axios
+      .get(`${SERVER_URL}/messages?room=${encodeURIComponent(savedRoom)}`)
+      .then((res) => {
+        setMessages(res.data || []);
+        // ✅ Auto-scroll to bottom once messages are loaded
+        setTimeout(() => scrollToBottom("auto"), 150);
+      })
+      .catch((err) => console.error("Failed to load messages:", err));
+  }
   }, []);
+
 
   // --- Auth handlers ---
   const handleAuth = async (e) => {
@@ -137,6 +156,7 @@ export default function App() {
     try {
       const res = await axios.get(`${SERVER_URL}/messages?room=${encodeURIComponent(r)}`);
       setMessages(res.data || []);
+      setTimeout(() => scrollToBottom("auto"), 100);
       if (username) socket.emit("joinRoom", { username, room: r });
       setTimeout(() => {
         scrollToBottom("auto");
@@ -469,7 +489,14 @@ export default function App() {
           {/* ✅ Typing indicator placed below messages but above composer */}
           {typingUser && (
             <div className="typing-container">
-              <p className="typing">{typingUser} is typing…</p>
+              <p className="typing">
+                {typingUser} is typing
+                <span className="dots">
+                  <span>.</span>
+                  <span>.</span>
+                  <span>.</span>
+                </span>
+              </p>
             </div>
           )}
 

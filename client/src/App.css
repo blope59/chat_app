@@ -317,15 +317,13 @@ body {
    ========================= */
 .typing-container {
   position: absolute;
-  bottom: 60px; /* sits just above the composer bar */
+  bottom: 60px; /* sits above input bar */
   left: 0;
   width: 100%;
   text-align: left;
   padding: 0 16px;
-  pointer-events: none; /* so it never blocks clicks */
+  pointer-events: none;
   z-index: 5;
-  opacity: 1;
-  transition: opacity 0.8s ease-in-out;
 }
 
 .typing {
@@ -333,10 +331,10 @@ body {
   font-style: italic;
   color: var(--muted);
   background: var(--card);
-  padding: 2px 10px;
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  animation: fadeInOut 0.5s ease-in-out infinite alternate;
+  padding: 3px 10px;
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  animation: fadeInOut 1s ease-in-out infinite alternate;
   transition: opacity 0.8s ease-in-out;
 }
 
@@ -597,7 +595,34 @@ body {
   filter: brightness(0.95);
 }
 
+.dots {
+  display: inline-block;
+  margin-left: 5px;
+}
 
+.dots span {
+  display: inline-block;
+  animation: blink 1.5s infinite;
+  font-weight: bold;
+  font-size: 1.2em;
+  opacity: 0;
+}
+
+.dots span:nth-child(1) {
+  animation-delay: 0s;
+}
+.dots span:nth-child(2) {
+  animation-delay: 0.3s;
+}
+.dots span:nth-child(3) {
+  animation-delay: 0.6s;
+}
+
+@keyframes blink {
+  0% { opacity: 0; }
+  50% { opacity: 1; }
+  100% { opacity: 0; }
+}
 
 
 
