@@ -28,7 +28,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Multer config
+// Multer config for avatars (signup)
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, path.join(__dirname, 'uploads')),
   filename: (req, file, cb) => {
@@ -38,7 +38,19 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// MongoDB connection
+// ✅ Multer config for chat message uploads
+const chatStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, path.join(__dirname, 'uploads')),
+  filename: (req, file, cb) => {
+    const uniqueName = Date.now() + '-' + file.originalname.replace(/\s+/g, '_');
+    cb(null, uniqueName);
+  },
+});
+const chatUpload = multer({ storage: chatStorage });
+
+// ===================================================
+// MONGODB CONNECTION
+// ===================================================
 mongoose
   .connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/chat_app', {
     useNewUrlParser: true,
@@ -103,6 +115,38 @@ app.post('/login', async (req, res) => {
   } catch (err) {
     console.error('Login error:', err);
     res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+// ===================================================
+// CHAT FILE UPLOAD ROUTE (Step 1)
+// ===================================================
+app.post('/upload-message', chatUpload.single('file'), async (req, res) => {
+  try {
+    const { username, room } = req.body;
+    if (!req.file || !username || !room)
+      return res.status(400).json({ error: 'Missing file or metadata' });
+
+    const user = await User.findOne({ username });
+    const fileUrl = `/uploads/${req.file.filename}`;
+    const msg = new Message({
+      room,
+      username,
+      text: '',
+      avatar: user?.avatar || '/uploads/default.png',
+      file: fileUrl,
+      fileName: req.file.originalname,
+      readBy: [],
+    });
+
+    await msg.save();
+    io.to(room).emit('receiveMessage', msg);
+
+    res.json({ success: true, message: msg });
+    console.log(`📎 File uploaded in [${room}] by ${username}: ${req.file.originalname}`);
+  } catch (err) {
+    console.error('File upload error:', err);
+    res.status(500).json({ error: 'File upload failed' });
   }
 });
 
@@ -187,10 +231,6 @@ io.on('connection', (socket) => {
       });
       await msg.save();
 
-      // Make sure the room is attached to the message
-      msg.room = room;
-
-      // Emit to everyone in room (including sender)
       io.to(room).emit('receiveMessage', msg);
       console.log(`💬 [${room}] ${username}: ${text}`);
     } catch (err) {
@@ -226,6 +266,7 @@ io.on('connection', (socket) => {
 server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
+
 
 
 

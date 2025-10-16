@@ -4,6 +4,38 @@ import axios from "axios";
 import EmojiPicker from "emoji-picker-react";
 import "./App.css";
 
+function groupMessagesByDate(messages) {
+  const groups = {};
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+
+  for (const msg of messages) {
+    const msgDate = new Date(msg.createdAt);
+    const msgKey = msgDate.toDateString();
+
+    if (!groups[msgKey]) groups[msgKey] = [];
+    groups[msgKey].push(msg);
+  }
+
+  // Convert to ordered array with readable labels
+  return Object.keys(groups)
+    .sort((a, b) => new Date(a) - new Date(b))
+    .map((dateKey) => {
+      const dateObj = new Date(dateKey);
+      let label;
+
+      if (dateObj.toDateString() === today.toDateString()) label = "Today";
+      else if (dateObj.toDateString() === yesterday.toDateString()) label = "Yesterday";
+      else {
+        const options = { month: "short", day: "numeric", year: "numeric" };
+        label = dateObj.toLocaleDateString(undefined, options);
+      }
+
+      return { label, messages: groups[dateKey] };
+    });
+}
+
 const SERVER_URL = process.env.REACT_APP_SERVER_URL || "http://localhost:3001";
 const socket = io(SERVER_URL, { transports: ["websocket"] });
 
@@ -259,6 +291,25 @@ export default function App() {
     socket.emit("sendMessage", { username, text: t, room });
   };
 
+  const handleFileUpload = async (e) => {
+  const file = e.target.files?.[0];
+  if (!file || !username || !room) return;
+
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("username", username);
+  formData.append("room", room);
+
+  try {
+    await axios.post(`${SERVER_URL}/upload-message`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  } catch (err) {
+    console.error("File upload failed:", err);
+    alert("File upload failed");
+  }
+  };
+
   // --- Emoji ---
   const onEmojiClick = (emojiData) => {
     setText((prev) => prev + (emojiData?.emoji || ""));
@@ -452,37 +503,78 @@ export default function App() {
 
         <section className="messages-area">
           <div className="messages" onScroll={handleScroll}>
-            {messages.map((m, i) => {
-              const mine = m.username === username;
-              const readers = (m.readBy || []).filter((u) => u !== m.username);
-              const userAvatar = mine
-                ? avatar
-                : m.avatar || `${SERVER_URL}/uploads/default.png`;
+            {groupMessagesByDate(messages).map((group, gi) => (
+              <div key={gi}>
+                {/* 🗓️ Date label */}
+                <div className="date-separator">{group.label}</div>
 
-              return (
-                <div
-                  key={m._id || i}
-                  className={`message ${mine ? "me" : "other"} ${m.pending ? "pending" : ""}`}
-                >
-                  {!mine && (
-                    <img
-                      src={userAvatar.startsWith("http") ? userAvatar : `${SERVER_URL}${userAvatar}`}
-                      alt={`${m.username} avatar`}
-                      className="msg-avatar"
-                      onError={(e) => (e.target.src = `${SERVER_URL}/uploads/default.png`)}
-                    />
-                  )}
-                  <div className="text">
-                    {!mine && <strong>{m.username}: </strong>}
-                    {m.text}
-                    <span className="timestamp">
-                      {formatTimestamp(m.createdAt)}
-                      {mine && (readers.length > 0 ? <DoubleCheck /> : <SingleCheck />)}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
+                {group.messages.map((m, i) => {
+                  const mine = m.username === username;
+                  const readers = (m.readBy || []).filter((u) => u !== m.username);
+                  const userAvatar = mine
+                    ? avatar
+                    : m.avatar || `${SERVER_URL}/uploads/default.png`;
+
+                  return (
+                    <div
+                      key={m._id || i}
+                      className={`message ${mine ? "me" : "other"} ${m.pending ? "pending" : ""}`}
+                    >
+                      {!mine && (
+                        <img
+                          src={
+                            userAvatar.startsWith("http")
+                              ? userAvatar
+                              : `${SERVER_URL}${userAvatar}`
+                          }
+                          alt={`${m.username} avatar`}
+                          className="msg-avatar"
+                          onError={(e) =>
+                            (e.target.src = `${SERVER_URL}/uploads/default.png`)
+                          }
+                        />
+                      )}
+                      <div className="text">
+                        {/* Sender name */}
+                        {!mine && <strong>{m.username}: </strong>}
+
+                        {/* Regular text message */}
+                        {m.text && <span>{m.text}</span>}
+
+                        {/* 📎 File or 📸 Image preview */}
+                        {m.file && (
+                          <div className="file-preview">
+                            {m.file.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
+                              <img
+                                src={`${SERVER_URL}${m.file}`}
+                                alt={m.fileName}
+                                className="chat-image"
+                                onError={(e) => (e.target.style.display = 'none')}
+                              />
+                            ) : (
+                              <a
+                                href={`${SERVER_URL}${m.file}`}
+                                download
+                                className="file-link"
+                                title={`Download ${m.fileName}`}
+                              >
+                                📎 {m.fileName}
+                              </a>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Timestamp and read receipts */}
+                        <span className="timestamp">
+                          {formatTimestamp(m.createdAt)}
+                          {mine && (readers.length > 0 ? <DoubleCheck /> : <SingleCheck />)}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
             <div ref={messagesEndRef} />
           </div>
 
@@ -517,7 +609,18 @@ export default function App() {
 
           {/* ✅ Composer stays at bottom */}
           <form className="composer" onSubmit={sendMessage}>
-            <div className="emoji-wrap">
+            <div className="composer-actions">
+              {/* 📎 File upload */}
+              <label className="upload-btn" title="Attach file">
+                📎
+                <input
+                  type="file"
+                  style={{ display: "none" }}
+                  onChange={(e) => handleFileUpload(e)}
+                />
+              </label>
+
+              {/* 😊 Emoji button */}
               <button
                 type="button"
                 className="emoji-btn"
@@ -527,6 +630,7 @@ export default function App() {
               >
                 😊
               </button>
+
               {showEmoji && (
                 <div className="emoji-popover" onMouseDown={(e) => e.preventDefault()}>
                   <EmojiPicker onEmojiClick={(emojiData) => onEmojiClick(emojiData)} />
