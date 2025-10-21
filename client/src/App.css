@@ -1,0 +1,733 @@
+/* =========================
+   Global / Theme
+   ========================= */
+:root {
+  --bg: #f6f7fb;
+  --card: #ffffff;
+  --accent: #5b8def;
+  --muted: #666;
+  --border: #f0f2f6;  
+  --text: #111;
+  --bubble-other: #e7ebf6;
+  --bubble-me: var(--accent);
+  --bubble-other-text: #000;
+  --bubble-me-text: #ffffff;
+}
+
+/* 🌙 Dark Mode */
+body.dark {
+  --bg: #1e1e1e;
+  --card: #2b2b2b;
+  --accent: #5b8def;
+  --muted: #aaa;
+  --border: #444;
+  --text: #f0f0f0;
+  --bubble-other: #3a3a3a;
+  --bubble-me: #5b8def;
+  --bubble-other-text: #eee;
+  --bubble-me-text: #fff;
+}
+
+body.dark .timestamp {
+  color: #ddd;
+  opacity: 0.95;
+}
+
+/* =========================
+   Global Layout
+   ========================= */
+body {
+  font-family: "Inter", sans-serif;
+  background: var(--bg);
+  margin: 0;
+  color: var(--text);
+  transition: background 0.3s, color 0.3s;
+}
+
+.app {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+}
+
+/* =========================
+   Auth (Login/Signup)
+   ========================= */
+.login {
+  background: var(--card);
+  padding: 30px;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  width: 320px;
+  text-align: center;
+}
+
+.login h2 {
+  margin-bottom: 20px;
+}
+
+.login form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.login input {
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  outline: none;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.login button {
+  background: var(--accent);
+  color: white;
+  border: none;
+  padding: 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.login button:hover {
+  opacity: 0.85;
+}
+
+.link {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+  font-size: 0.9em;
+}
+
+/* =========================
+   Chat Layout
+   ========================= */
+.chat-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.chat-header {
+  background: var(--card);
+  padding: 15px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.chat-header h2 {
+  margin: 0;
+  font-size: 1.2em;
+}
+
+.chat-header button {
+  margin-left: 8px;
+  background: var(--accent);
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.chat-header button:hover {
+  opacity: 0.85;
+}
+
+.chat-main {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* =========================
+   Sidebar (Online Users)
+   ========================= */
+.sidebar {
+  width: 220px;
+  background: var(--card);
+  border-right: 1px solid var(--border);
+  padding: 15px;
+  box-sizing: border-box;
+  overflow-y: auto;
+}
+
+.sidebar h4 {
+  margin: 0 0 10px;
+  font-size: 1.1em;
+}
+
+.sidebar ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.sidebar li {
+  padding: 6px 8px;
+  border-radius: 6px;
+  margin-bottom: 5px;
+  background: var(--bubble-other);
+  color: var(--bubble-other-text);
+}
+
+/* =========================
+   Messages Area
+   ========================= */
+.messages-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  position: relative;
+}
+
+.messages {
+  flex: 1;
+  padding: 20px 12px 10px;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+  position: relative;
+}
+
+/* Hide scrollbar (optional aesthetic) */
+.messages::-webkit-scrollbar {
+  width: 6px;
+}
+
+.messages::-webkit-scrollbar-thumb {
+  background: var(--muted);
+  border-radius: 6px;
+}
+
+/* =========================
+   Message Bubble
+   ========================= */
+.message {
+  margin-bottom: 12px;
+  display: flex;
+}
+
+.message.me {
+  justify-content: flex-end;
+}
+
+.message.other {
+  justify-content: flex-start;
+}
+
+.message .text {
+  max-width: 70%;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--bubble-other);
+  color: var(--bubble-other-text);
+  position: relative;
+  word-wrap: break-word;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.message.me .text {
+  background: var(--bubble-me);
+  color: var(--bubble-me-text);
+}
+
+.timestamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75em;
+  color: color-mix(in srgb, var(--text) 70%, var(--muted));
+  margin-left: 6px;
+}
+
+/* =========================
+   ✅ Read Status
+   ========================= */
+.read-status {
+  margin-left: 6px;
+  font-size: 0.9em;
+  color: gray !important;          /* single check: gray */
+  opacity: 0.7;
+  transition: color 0.3s ease, opacity 0.3s ease;
+}
+
+/* ✅ Ensure checkmarks always have true colors */
+.message.me .read-status {
+  color: gray !important; /* single check */
+}
+
+.message.me .read-status.read {
+  color: #2196f3 !important; /* double check */
+}
+
+.read-status.read {
+  color: #2196f3 !important;       /* double check: blue */
+  opacity: 1;
+  animation: fadeBlue 0.4s ease forwards;
+}
+
+@keyframes fadeBlue {
+  from { opacity: 0.6; color: gray; }
+  to { opacity: 1; color: #2196f3; }
+}
+
+/* =========================
+   Composer (Input)
+   ========================= */
+.composer {
+  display: flex;
+  padding: 10px;
+  border-top: 1px solid var(--border);
+  background: var(--card);
+}
+
+.composer textarea {
+  flex: 1;
+  resize: none;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  outline: none;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--bg);
+}
+
+.composer button {
+  margin-left: 10px;
+  background: var(--accent);
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.composer button:hover {
+  opacity: 0.85;
+}
+
+/* =========================
+   Typing + Notification
+   ========================= */
+.typing-container {
+  position: absolute;
+  bottom: 60px; /* sits above input bar */
+  left: 0;
+  width: 100%;
+  text-align: left;
+  padding: 0 16px;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.typing {
+  display: inline-block;
+  font-style: italic;
+  color: var(--muted);
+  background: var(--card);
+  padding: 3px 10px;
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  animation: fadeInOut 1s ease-in-out infinite alternate;
+  transition: opacity 0.8s ease-in-out;
+}
+
+.newMessages {
+  position: absolute;
+  bottom: 70px;
+  right: 20px;
+  background: var(--accent);
+  color: white;
+  padding: 8px 14px;
+  border-radius: 20px;
+  font-size: 0.9em;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  opacity: 1;
+  transition: opacity 0.5s ease;
+  animation: fadeIn 0.3s ease forwards;
+}
+
+.newMessages.hide {
+  opacity: 0;
+  pointer-events: none;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInOut {
+  from { opacity: 0.4; }
+  to { opacity: 1; }
+}
+
+/* =========================
+   Responsive
+   ========================= */
+@media (max-width: 768px) {
+  .sidebar {
+    display: none;
+  }
+  .messages .text {
+    max-width: 85%;
+  }
+}
+
+/* =========================
+   ✅ WhatsApp-Style Animated SVG Checkmarks
+   ========================= */
+.tick-icon {
+  width: 18px;
+  height: 18px;
+  vertical-align: middle;
+  margin-left: 6px;
+  opacity: 0.9;
+  filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.7));
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+/* Single (Delivered) */
+.tick-icon.single path {
+  stroke: #dcdcdc !important; /* light gray */
+  stroke-width: 2;
+}
+
+/* Double (Read) */
+.tick-icon.double path {
+  stroke: #00e5ff !important; /* bright cyan */
+  stroke-width: 2;
+}
+
+/* Container to animate the pair */
+.timestamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75em;
+  color: var(--muted);
+  margin-left: 6px;
+  position: relative;
+  right: -2px;
+  transition: all 0.3s ease;
+}
+
+/* ✨ Animation: when double-check appears */
+.message.me .tick-icon.double {
+  animation: slideInChecks 0.35s ease forwards;
+  transform-origin: center;
+}
+
+@keyframes slideInChecks {
+  0% {
+    transform: translateX(8px) scale(0.8);
+    opacity: 0.3;
+  }
+  60% {
+    transform: translateX(-2px) scale(1.05);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(0) scale(1);
+  }
+}
+
+/* Slight pop when changing from single to double */
+.message.me .tick-icon.double path {
+  animation: colorFade 0.4s ease forwards;
+}
+
+@keyframes colorFade {
+  0% {
+    stroke: #dcdcdc;
+  }
+  100% {
+    stroke: #00e5ff;
+  }
+}
+
+/* =========================
+   💬 Message Bounce Animation
+   ========================= */
+.message {
+  animation: fadeIn 0.2s ease forwards;
+}
+
+.message.me .text,
+.message.other .text {
+  animation: bounceIn 0.25s ease forwards;
+  transform-origin: bottom;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes bounceIn {
+  0% {
+    transform: translateY(15px) scale(0.98);
+    opacity: 0.4;
+  }
+  60% {
+    transform: translateY(-3px) scale(1.02);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+/* === Emoji picker UI === */
+.emoji-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-right: 8px;
+}
+
+.emoji-btn {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.emoji-btn:hover {
+  filter: brightness(0.98);
+}
+
+.emoji-popover {
+  position: absolute;
+  bottom: 48px;            /* sit above the composer */
+  left: 0;
+  z-index: 20;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 8px 22px rgba(0,0,0,0.15);
+  overflow: hidden;
+}
+
+/* Rooms UI */
+.room-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.room-badge {
+  background: var(--bubble-other);
+  color: var(--bubble-other-text);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+.room-badge:hover { filter: brightness(0.98); }
+
+/* Emoji picker (you already added in prior step, included here just in case) */
+.emoji-wrap { position: relative; display: flex; align-items: center; margin-right: 8px; }
+.emoji-btn { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; cursor: pointer; }
+.emoji-btn:hover { filter: brightness(0.98); }
+.emoji-popover {
+  position: absolute;
+  bottom: 48px;
+  left: 0;
+  z-index: 20;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 8px 22px rgba(0,0,0,0.15);
+  overflow: hidden;
+}
+
+/* ==== Avatar Styling ==== */
+.msg-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-right: 8px;
+  border: 1px solid var(--border);
+}
+
+.online-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.online-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 6px;
+  gap: 6px;
+}
+
+.online-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--border);
+}
+
+/* Dim pending messages before they're confirmed by server */
+.message.pending .text {
+  opacity: 0.6;
+  filter: brightness(0.95);
+}
+
+.dots {
+  display: inline-block;
+  margin-left: 5px;
+}
+
+.dots span {
+  display: inline-block;
+  animation: blink 1.5s infinite;
+  font-weight: bold;
+  font-size: 1.2em;
+  opacity: 0;
+}
+
+.dots span:nth-child(1) {
+  animation-delay: 0s;
+}
+.dots span:nth-child(2) {
+  animation-delay: 0.3s;
+}
+.dots span:nth-child(3) {
+  animation-delay: 0.6s;
+}
+
+@keyframes blink {
+  0% { opacity: 0; }
+  50% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.date-separator {
+  position: sticky;
+  top: 4px; /* small offset from top */
+  z-index: 3;
+  display: inline-block;
+  background: var(--card);
+  margin: 8px auto;
+  padding: 2px 12px;
+  border-radius: 10px;
+  font-size: 0.8em;
+  font-weight: 600;
+  color: var(--muted);
+  opacity: 0.9;
+  text-align: center;
+  width: fit-content;
+  left: 50%;
+  transform: translateX(-50%);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(6px);
+  background: color-mix(in srgb, var(--card) 70%, transparent);
+}
+
+.date-separator::before,
+.date-separator::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 35%;
+  height: 1px;
+  background: var(--border);
+  display: none;
+}
+
+.date-separator::before {
+  left: 0;
+}
+.date-separator::after {
+  right: 0;
+}
+
+.file-preview {
+  margin-top: 6px;
+}
+
+.chat-image {
+  max-width: 220px;
+  max-height: 180px;
+  border-radius: 8px;
+  object-fit: cover;
+  display: block;
+}
+
+.file-link {
+  display: inline-block;
+  background: var(--card);
+  border: 1px solid var(--border);
+  padding: 4px 8px;
+  border-radius: 6px;
+  text-decoration: none;
+  color: var(--text);
+  font-size: 0.9em;
+}
+.file-link:hover {
+  background: var(--accent);
+  color: #fff;
+}
+.upload-btn {
+  cursor: pointer;
+  margin-right: 8px;
+  font-size: 1.2em;
+}
+
+.upload-progress {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  font-size: 0.8em;
+  color: var(--muted);
+}
+
+.upload-bar {
+  width: 180px;
+  height: 6px;
+  background: var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+
+.upload-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.2s ease;
+}
+
+.upload-label {
+  opacity: 0.8;
+}
+
+

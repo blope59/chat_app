@@ -1,0 +1,4 @@
+# Ignore uploaded and local files
+uploads/
+node_modules/
+.env
