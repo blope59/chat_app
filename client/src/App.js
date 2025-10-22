@@ -184,13 +184,24 @@ export default function App() {
   // --- Join room ---
   const joinRoom = async (targetRoom) => {
     const r = (targetRoom || newRoom || "").trim() || "general";
+
+    // ✅ Clear typing and UI state immediately
+    setTypingUser(null);
+    setShowEmoji(false);
+    setText("");
+
     setRoom(r);
     localStorage.setItem("chatRoom", r);
 
     try {
+      // Load all messages for the selected room
       const res = await axios.get(`${SERVER_URL}/messages?room=${encodeURIComponent(r)}`);
       setMessages(res.data || []);
+
+      // Wait a short moment and scroll down automatically
       setTimeout(() => scrollToBottom("auto"), 100);
+
+      // Join socket room and mark messages as read
       if (username) socket.emit("joinRoom", { username, room: r });
       setTimeout(() => {
         scrollToBottom("auto");
@@ -200,6 +211,7 @@ export default function App() {
       console.error("Failed to load room messages:", err);
     }
 
+    // Refresh available room list
     axios.get(`${SERVER_URL}/rooms`).then((res) => setRooms(res.data || [])).catch(() => {});
   };
 
@@ -359,6 +371,13 @@ export default function App() {
     return () => hideTimerRef.current && clearTimeout(hideTimerRef.current);
   }, [showNewMessages]);
 
+  // --- Auto-hide typing indicator after 2 seconds ---
+useEffect(() => {
+  if (!typingUser) return; // nothing to clear if nobody's typing
+  const timeout = setTimeout(() => setTypingUser(null), 2000);
+  return () => clearTimeout(timeout);
+}, [typingUser]);
+
   // --- Scroll (mark as read) ---
   const handleScroll = (e) => {
     const el = e.target;
@@ -369,6 +388,19 @@ export default function App() {
       hideTimerRef.current && clearTimeout(hideTimerRef.current);
       if (username && room) socket.emit("markAsRead", { username, room });
     }
+  };
+
+  // --- Format last seen (helper) ---
+  const formatLastSeen = (timestamp) => {
+    if (!timestamp) return "a while ago";
+    const diff = Date.now() - new Date(timestamp).getTime();
+    const minutes = Math.floor(diff / 60000);
+    if (minutes < 1) return "just now";
+    if (minutes < 60) return `${minutes} minute${minutes > 1 ? "s" : ""} ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours} hour${hours > 1 ? "s" : ""} ago`;
+    const days = Math.floor(hours / 24);
+    return `${days} day${days > 1 ? "s" : ""} ago`;
   };
 
   // --- UI rendering ---
@@ -504,19 +536,22 @@ export default function App() {
         <aside className="sidebar">
           <h4>Online in #{room}</h4>
           <ul className="online-list">
-            {onlineUsers.map((u, i) => (
-              <li key={i} className="online-item">
+            {onlineUsers.map((u) => (
+              <div key={u.username} className={`user ${u.online ? "online" : "offline"}`}>
                 <img
-                  src={`${SERVER_URL}${u.avatar || "/uploads/default.png"}`}
-                  alt={`${u.username} avatar`}
-                  className="online-avatar"
-                  onError={(e) => (e.target.src = `${SERVER_URL}/uploads/default.png`)}
+                  src={`${SERVER_URL}${u.avatar}`}
+                  alt={u.username}
+                  className="user-avatar"
                 />
-                <span>{u.username}</span>
-              </li>
+                <div className="user-info">
+                  <span className="username">{u.username}</span>
+                  <span className={`status ${u.online ? "online" : "offline"}`}>
+                    {u.online ? "🟢 Online" : `Last seen ${formatLastSeen(u.lastSeen)}`}
+                  </span>
+                </div>
+              </div>
             ))}
           </ul>
-
           <div style={{ marginTop: 12 }}>
             <button
               className="link"
@@ -621,13 +656,11 @@ export default function App() {
 
           {/* ✅ Typing indicator placed below messages but above composer */}
           {typingUser && (
-            <div className="typing-container">
+            <div className={`typing-container ${!typingUser ? "hide" : ""}`}>
               <p className="typing">
                 {typingUser} is typing
                 <span className="dots">
-                  <span>.</span>
-                  <span>.</span>
-                  <span>.</span>
+                  <span>.</span><span>.</span><span>.</span>
                 </span>
               </p>
             </div>

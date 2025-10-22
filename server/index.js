@@ -22,13 +22,17 @@ const io = new Server(server, {
   cors: { origin: CLIENT_URL, methods: ['GET', 'POST'] },
 });
 
+// ===================================================
 // Middleware
+// ===================================================
 app.use(cors({ origin: CLIENT_URL }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Multer config for avatars (signup)
+// ===================================================
+// Multer config (avatars + chat uploads)
+// ===================================================
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, path.join(__dirname, 'uploads')),
   filename: (req, file, cb) => {
@@ -38,7 +42,6 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// ✅ Multer config for chat message uploads
 const chatStorage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, path.join(__dirname, 'uploads')),
   filename: (req, file, cb) => {
@@ -49,7 +52,7 @@ const chatStorage = multer.diskStorage({
 const chatUpload = multer({ storage: chatStorage });
 
 // ===================================================
-// MONGODB CONNECTION
+// MongoDB Connection
 // ===================================================
 mongoose
   .connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/chat_app', {
@@ -77,7 +80,15 @@ app.post('/signup', upload.single('avatar'), async (req, res) => {
       ? `/uploads/${req.file.filename}`
       : '/uploads/default.png';
 
-    const user = new User({ username, email, password: hashed, avatar: avatarPath });
+    const user = new User({
+      username,
+      email,
+      password: hashed,
+      avatar: avatarPath,
+      online: false,
+      lastSeen: new Date(),
+    });
+
     await user.save();
 
     const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '7d' });
@@ -119,7 +130,7 @@ app.post('/login', async (req, res) => {
 });
 
 // ===================================================
-// CHAT FILE UPLOAD ROUTE (Step 1)
+// CHAT FILE UPLOAD ROUTE
 // ===================================================
 app.post('/upload-message', chatUpload.single('file'), async (req, res) => {
   try {
@@ -178,39 +189,55 @@ app.get('/messages', async (req, res) => {
 });
 
 // ===================================================
-// SOCKET.IO
+// SOCKET.IO (Per-Room Online Tracking)
 // ===================================================
 const onlineUsers = new Map();
 
+// ✅ Emit users currently connected to a specific room
 function emitOnlineUsers(room) {
-  const users = Array.from(onlineUsers.values())
+  const usersInRoom = Array.from(onlineUsers.values())
     .filter((u) => u.room === room)
     .map((u) => ({
       username: u.username,
       avatar: u.avatar || '/uploads/default.png',
+      online: true,
+      lastSeen: new Date(),
     }));
-  io.to(room).emit('onlineUsers', users);
+  io.to(room).emit('onlineUsers', usersInRoom);
 }
 
 io.on('connection', (socket) => {
   console.log('🟢 New client connected:', socket.id);
 
+  // --- Join Room ---
   socket.on('joinRoom', async ({ username, room }) => {
     const chosenRoom = (room || 'general').trim();
+
+    // ✅ Leave any previous rooms before joining the new one
+    for (const joined of socket.rooms) {
+      if (joined !== socket.id) {
+        socket.leave(joined);
+      }
+    }
+
     socket.username = username;
     socket.room = chosenRoom;
 
-    const user = await User.findOne({ username });
-    const avatar = user?.avatar || '/uploads/default.png';
+    const user = await User.findOneAndUpdate(
+      { username },
+      { online: true },
+      { new: true }
+    );
 
     socket.join(chosenRoom);
-    onlineUsers.set(socket.id, { username, room: chosenRoom, avatar });
+    onlineUsers.set(socket.id, { username, room: chosenRoom, avatar: user?.avatar });
     knownRooms.add(chosenRoom);
-    emitOnlineUsers(chosenRoom);
 
+    emitOnlineUsers(chosenRoom);
     console.log(`👤 ${username} joined room: ${chosenRoom}`);
   });
 
+  // --- Typing Indicators ---
   socket.on('typing', ({ username, room }) => {
     socket.to(room).emit('typing', username);
   });
@@ -219,6 +246,7 @@ io.on('connection', (socket) => {
     socket.to(room).emit('stopTyping');
   });
 
+  // --- Sending Messages ---
   socket.on('sendMessage', async ({ username, text, room }) => {
     try {
       const user = await User.findOne({ username });
@@ -238,6 +266,7 @@ io.on('connection', (socket) => {
     }
   });
 
+  // --- Read Receipts ---
   socket.on('markAsRead', async ({ username, room }) => {
     try {
       const unread = await Message.find({ room, readBy: { $ne: username } });
@@ -252,8 +281,15 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('disconnect', () => {
+  // --- Disconnect Handling ---
+  socket.on('disconnect', async () => {
     const info = onlineUsers.get(socket.id);
+    if (info?.username) {
+      await User.findOneAndUpdate(
+        { username: info.username },
+        { online: false, lastSeen: new Date() }
+      );
+    }
     onlineUsers.delete(socket.id);
     if (info?.room) emitOnlineUsers(info.room);
     console.log('🔴 Disconnected:', socket.id);
@@ -266,6 +302,8 @@ io.on('connection', (socket) => {
 server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
+
+
 
 
 
