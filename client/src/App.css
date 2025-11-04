@@ -286,10 +286,13 @@ body {
    ========================= */
 .composer {
   display: flex;
+  align-items: center;       /* vertically center buttons + textarea */
+  gap: 10px;
   padding: 10px;
   border-top: 1px solid var(--border);
   background: var(--card);
 }
+
 
 .composer textarea {
   flex: 1;
@@ -796,4 +799,33 @@ body {
   box-shadow: 0 0 0 2px #22c55e; /* Base ring */
   animation: pulseRing 2s infinite;
   transition: box-shadow 0.3s ease;
+}
+
+/* Stronger section separators ONLY in light mode */
+body:not(.dark) .chat-header {
+  border-bottom: 2px solid #d0d4dc;  /* darker line */
+}
+
+body:not(.dark) .sidebar {
+  border-right: 2px solid #d0d4dc;   /* clearer divider */
+}
+
+body:not(.dark) .messages-area {
+  border-top: 0px solid #d0d4dc;
+  border-bottom: 2px solid #d0d4dc;
+}
+
+body:not(.dark) .typing-container {
+  border-top: 2px solid #d0d4dc;     /* separates typing indicator from messages */
+}
+
+body:not(.dark) .composer {
+  border-top: 2px solid #d0d4dc;     /* separates composer from messages */
+}
+
+/* Make timestamp stand out on blue bubbles */
+body:not(.dark) .message.me .timestamp {
+  color: #ffffff !important;          
+  text-shadow: 0 1px 2px rgba(0,0,0,0.28); 
+  opacity: 0.95;
 }

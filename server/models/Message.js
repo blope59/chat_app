@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 
 const MessageSchema = new mongoose.Schema({
-  room: { type: String, default: "global" },
+  room: { type: String, default: "general" },
   username: { type: String, required: true },
   text: { type: String, default: "" },
   avatar: { type: String, default: "/uploads/default.png" },
