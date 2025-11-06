@@ -129,6 +129,63 @@ app.post('/login', async (req, res) => {
   }
 });
 
+// --- Auth middleware ---
+function auth(req, res, next) {
+  try {
+    const header = req.headers.authorization || "";
+    const token = header.startsWith("Bearer ") ? header.slice(7) : null;
+    if (!token) return res.status(401).json({ error: "Missing token" });
+    const payload = jwt.verify(token, JWT_SECRET);
+    req.userId = payload.id;
+    next();
+  } catch (e) {
+    return res.status(401).json({ error: "Invalid token" });
+  }
+}
+
+// --- Get current user profile ---
+app.get('/me', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId).select('username email avatar');
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json(user);
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to fetch profile' });
+  }
+});
+
+// --- Update avatar and/or password ---
+app.put('/me', auth, upload.single('avatar'), async (req, res) => {
+  try {
+    const user = await User.findById(req.userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    if (req.file) {
+      user.avatar = `/uploads/${req.file.filename}`;
+    }
+
+    const { currentPassword, newPassword } = req.body || {};
+    if (currentPassword || newPassword) {
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ error: 'Provide currentPassword and newPassword' });
+      }
+      const ok = await bcrypt.compare(currentPassword, user.password);
+      if (!ok) return res.status(400).json({ error: 'Current password is incorrect' });
+      user.password = await bcrypt.hash(newPassword, 10);
+    }
+
+    await user.save();
+
+    // notify clients (optional)
+    io.emit('profileUpdated', { username: user.username, avatar: user.avatar });
+
+    res.json({ username: user.username, email: user.email, avatar: user.avatar });
+  } catch (e) {
+    console.error('Update profile error:', e);
+    res.status(500).json({ error: 'Failed to update profile' });
+  }
+});
+
 // ===================================================
 // CHAT FILE UPLOAD ROUTE
 // ===================================================
